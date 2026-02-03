@@ -1,5 +1,5 @@
 def main():
-    print('Hi from robot_planner.')
+    print('Hi from robot_bringup.')
 
 
 if __name__ == '__main__':

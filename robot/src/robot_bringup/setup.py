@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package_name = 'robot_navi'
+package_name = 'robot_bringup'
 
 setup(
     name=package_name,
@@ -13,9 +13,9 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='Crexodon',
-    maintainer_email='ros@crexy.moe',
-    description='Simulated robot navigation node',
+    maintainer='mia',
+    maintainer_email='github@crexy.moe',
+    description='TODO: Package description',
     license='MIT',
     extras_require={
         'test': [
@@ -24,7 +24,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'robot_navi = robot_navi.robot_navi:main'
+            'robot_bringup = robot_bringup.robot_bringup:main'
         ],
     },
 )

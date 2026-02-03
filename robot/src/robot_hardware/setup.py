@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package_name = 'station'
+package_name = 'robot_hardware'
 
 setup(
     name=package_name,
@@ -13,9 +13,9 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='Crexodon',
-    maintainer_email='ros@crexy.moe',
-    description='Simulated station node',
+    maintainer='mia',
+    maintainer_email='github@crexy.moe',
+    description='TODO: Package description',
     license='MIT',
     extras_require={
         'test': [
@@ -24,7 +24,9 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'station = station.station:main'
+            'battery_controller = robot_hardware.battery_controller:main',
+            'diff_drive_controller = robot_hardware.diff_drive_controller:main',
+            'gripper_controller = robot_hardware.gripper_controler:main'
         ],
     },
 )
