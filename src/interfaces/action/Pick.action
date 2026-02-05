@@ -1,0 +1,6 @@
+int32 package_idx   # -1 => first available
+---
+string result
+int32 package_idx
+---
+float32 progress

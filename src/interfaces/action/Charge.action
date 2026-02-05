@@ -1,0 +1,6 @@
+float32 target_battery  # e.g. 1.0
+---
+string result
+float32 battery
+---
+float32 battery
