@@ -16,6 +16,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/ResetEpisode.srv"
   "srv/Enqueue.srv"
   "srv/Dequeue.srv"
+  "srv/GetPackages.srv"
   "action/Pick.action"
   "action/Charge.action"
   DEPENDENCIES action_msgs std_msgs
