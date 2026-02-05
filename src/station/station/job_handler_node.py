@@ -1,7 +1,7 @@
 import random
 from rclpy.node import Node
 import rclpy
-from interfaces.srv import SetPackageInfo, ResetEpisode
+from interfaces.srv import SetPackageInfo, ResetEpisode, GetPackages
 from interfaces.msg import PackageState, WorldEvent
 
 VALID_FIELDS = {
@@ -21,6 +21,8 @@ class JobHandler(Node):
 
         self.pub_event = self.create_publisher(WorldEvent, "/world_event", 10)
         self.sub_event = self.create_subscription(WorldEvent, "/world_event", self.on_world_event, 10)
+
+        self.srv_get_packages = self.create_service(GetPackages, "/get_packages", self.on_get_packages)
 
 
         self._init_packages(self._num_packages)
@@ -108,6 +110,9 @@ class JobHandler(Node):
             return
 
         p = self._packages[idx]
+        # Only route if C really succeeded, i.e. station C set lifecycle_state to READY
+        if p.lifecycle_state != "READY":
+            return
 
         # Decide routing based on shipping_type (SoT)
         if p.shipping_type == "express":
@@ -117,6 +122,11 @@ class JobHandler(Node):
 
         # Emit a package updated event so the aggregator/MDP gets a new decision point
         self._emit_event("PACKAGE_ROUTED", "job_handler", package_idx=idx, station_id="C")
+
+    def on_get_packages(self, req: GetPackages.Request, res: GetPackages.Response):
+        # req.all is currently unused (but kept for future extensibility)
+        res.packages = self._packages
+        return res
 
 
 def main():

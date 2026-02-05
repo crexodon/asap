@@ -2,9 +2,10 @@ import random
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionServer
-from interfaces.srv import Enqueue, Dequeue, SetPackageInfo
+from interfaces.srv import Enqueue, Dequeue, SetPackageInfo, GetPackages
 from interfaces.action import Pick, Charge
-from interfaces.msg import StationState, WorldEvent, RobotState
+from interfaces.msg import WorldEvent, RobotState
+import time
 
 STATIONS = ["A","B","C","D","E","F","G"]
 
@@ -18,6 +19,9 @@ class StationNode(Node):
         self.station_id = self.get_parameter("station_id").get_parameter_value().string_value
         self.rng = random.Random(self.get_parameter("seed").get_parameter_value().integer_value)
         self.process_dt = float(self.get_parameter("process_dt").get_parameter_value().double_value)
+
+        self.cli_get_pkgs = self.create_client(GetPackages, "/get_packages")
+
 
         if self.station_id not in STATIONS:
             raise RuntimeError("Invalid station_id")
@@ -42,6 +46,13 @@ class StationNode(Node):
         self.srv_enqueue = self.create_service(Enqueue, f"/robot_action/{self.station_id}/enqueue", self.on_enqueue)
         self.srv_dequeue = self.create_service(Dequeue, f"/robot_action/{self.station_id}/dequeue", self.on_dequeue)
 
+        # Service for Job spawn
+        # Spawn service (only Station A) - NO robot-present gate
+        self.srv_spawn = None
+        if self.station_id == "A":
+            self.srv_spawn = self.create_service(Enqueue, "/station/A/spawn", self.on_spawn)
+
+
         # Actions (only for A and F)
         self.pick_server = None
         self.charge_server = None
@@ -58,6 +69,26 @@ class StationNode(Node):
 
     def on_robot_state(self, msg: RobotState):
         self.robot_location = msg.robot_location
+    
+    def on_spawn(self, req: Enqueue.Request, res: Enqueue.Response):
+        # NO robot_present check!
+        pkg = int(req.package_idx)
+
+        # In your concept: spawned job should be immediately available for pickup at A
+        self.output_queue.append(pkg)
+
+        res.result = "ACCEPTED"
+        res.position = len(self.output_queue) - 1
+        res.actual_package_idx = pkg
+
+        # Update SoT: package is at A and READY for pickup
+        self.set_pkg(pkg,
+                    ["current_location", "lifecycle_state", "availability", "next_location"],
+                    ["A", "READY", "true", "B"])
+
+        self.emit_event("QUEUE_CHANGED", package_idx=pkg)
+        return res
+
 
     def emit_event(self, event_type: str, package_idx: int = -1):
         self._tick_id += 1
@@ -104,7 +135,12 @@ class StationNode(Node):
         res.actual_package_idx = pkg
 
         # package is now at station input
-        self.set_pkg(pkg, ["current_location","lifecycle_state","availability"], [self.station_id, "WAITING", "false"])
+        if self.station_id == "E":
+            # DO NOT overwrite lifecycle_state, because FAILED must remain FAILED for bypass logic
+            self.set_pkg(pkg, ["current_location", "availability"], [self.station_id, "false"])
+        else:
+            self.set_pkg(pkg, ["current_location","lifecycle_state","availability"], [self.station_id, "WAITING", "false"])
+
         self.emit_event("QUEUE_CHANGED", package_idx=pkg)
         return res
 
@@ -140,10 +176,28 @@ class StationNode(Node):
         self.set_pkg(pkg, ["current_location","availability"], ["ROBOT","false"])
         self.emit_event("QUEUE_CHANGED", package_idx=pkg)
         return res
+    
+    def get_pkg_lifecycle(self, package_idx: int) -> str | None:
+        if not self.cli_get_pkgs.wait_for_service(timeout_sec=1.0):
+            self.get_logger().error("get_packages service not available")
+            return None
+
+        req = GetPackages.Request()
+        req.all = True
+        fut = self.cli_get_pkgs.call_async(req)
+        rclpy.spin_until_future_complete(self, fut, timeout_sec=2.0)
+        if not fut.done() or fut.result() is None:
+            self.get_logger().error("get_packages call failed")
+            return None
+
+        for p in fut.result().packages:
+            if int(p.package_idx) == int(package_idx):
+                return str(p.lifecycle_state)
+        return None
+
 
     # ---------------- Actions ----------------
-    async def execute_pick(self, goal_handle):
-        # A-specific: pick requires duration and robot presence
+    def execute_pick(self, goal_handle):
         if self.station_id != "A":
             goal_handle.abort()
             result = Pick.Result()
@@ -158,8 +212,6 @@ class StationNode(Node):
             result.package_idx = -1
             return result
 
-        # In this simplified model: spawner puts items into A.input, and A immediately makes them ready in output.
-        # We'll pick from A.output_queue
         wanted = int(goal_handle.request.package_idx)
         if len(self.output_queue) == 0:
             goal_handle.abort()
@@ -179,57 +231,51 @@ class StationNode(Node):
                 return result
             pkg = wanted
 
-        # simulate duration that requires robot presence
-        duration = 1.0 + self.rng.random() * 1.0  # U(1.0,2.0)
-        elapsed = 0.0
-        while elapsed < duration:
-            if not self.robot_present():
-                # abort and keep pkg in output
-                goal_handle.abort()
-                result = Pick.Result()
-                result.result = "ABORTED_LEFT_STATION"
-                result.package_idx = pkg
-                self.emit_event("ACTION_RESULT", package_idx=pkg)
-                return result
+        # Retry loop: repeat same package until success, while robot stays present
+        attempt = 0
+        while True:
+            attempt += 1
 
-            fb = Pick.Feedback()
-            fb.progress = float(elapsed / duration)
-            goal_handle.publish_feedback(fb)
-            await rclpy.task.Future()  # placeholder; replaced below
+            # simulate duration (hidden)
+            duration = 1.0 + self.rng.random() * 1.0  # U(1.0,2.0)
+            t0 = time.time()
 
-        # This async approach without asyncio is awkward in rclpy.
-        # We'll implement a simple blocking loop with rate instead:
-        goal_handle.execute()
+            while (time.time() - t0) < duration:
+                if not self.robot_present():
+                    goal_handle.abort()
+                    result = Pick.Result()
+                    result.result = "ABORTED_LEFT_STATION"
+                    result.package_idx = pkg
+                    self.emit_event("ACTION_RESULT", package_idx=pkg)
+                    return result
 
-        # blocking part
-        rate = self.create_rate(20)
-        elapsed = 0.0
-        while elapsed < duration:
-            if not self.robot_present():
-                goal_handle.abort()
-                result = Pick.Result()
-                result.result = "ABORTED_LEFT_STATION"
-                result.package_idx = pkg
-                self.emit_event("ACTION_RESULT", package_idx=pkg)
-                return result
-            fb = Pick.Feedback()
-            fb.progress = float(elapsed / duration)
-            goal_handle.publish_feedback(fb)
-            rate.sleep()
-            elapsed += 0.05
+                elapsed = time.time() - t0
+                fb = Pick.Feedback()
+                fb.progress = float(min(1.0, elapsed / duration))
+                goal_handle.publish_feedback(fb)
+                time.sleep(0.05)
+
+            # success probability 0.95
+            success = (self.rng.random() < 0.95)
+            if success:
+                break
+            # else: failed -> repeat same package again (no state change necessary)
 
         # commit: remove from output_queue
         if pkg in self.output_queue:
             self.output_queue.remove(pkg)
 
         # update package as on robot and next_location=B
-        self.set_pkg(pkg, ["current_location","next_location","lifecycle_state","availability"], ["ROBOT","B","READY","false"])
+        self.set_pkg(pkg, ["current_location", "next_location", "lifecycle_state", "availability"],
+                    ["ROBOT", "B", "READY", "false"])
+
         goal_handle.succeed()
         result = Pick.Result()
         result.result = "SUCCEEDED"
         result.package_idx = pkg
         self.emit_event("ACTION_RESULT", package_idx=pkg)
         return result
+
 
     async def execute_charge(self, goal_handle):
         if self.station_id != "F":
@@ -276,6 +322,22 @@ class StationNode(Node):
             if len(self.input_queue) == 0:
                 return
             self.processing_idx = self.input_queue.pop(0)
+            if self.station_id == "E":
+                lifecycle = self.get_pkg_lifecycle(self.processing_idx)
+                if lifecycle == "FAILED":
+                    # bypass: do not process, directly into failed output queue
+                    pkg = self.processing_idx
+                    self.processing_idx = -1
+                    self.processing_state = "IDLE"
+
+                    self.output_failed_queue.append(pkg)
+                    # terminal: keep FAILED and send to FINISH
+                    self.set_pkg(pkg, ["next_location", "availability"], ["FINISH", "false"])
+
+                    self.emit_event("PROCESS_FINISHED", package_idx=pkg)
+                    self.emit_event("QUEUE_CHANGED", package_idx=pkg)
+                    return
+
             self.processing_state = "RUNNING"
 
             if self.station_id == "B":

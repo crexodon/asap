@@ -7,10 +7,13 @@ class JobSpawner(Node):
         super().__init__("job_spawner")
 
         self.cli_reset = self.create_client(ResetEpisode, "/reset_episode")
-        self.cli_enqueue_a = self.create_client(Enqueue, "/robot_action/A/enqueue")
+        self.cli_spawn_a = self.create_client(Enqueue, "/station/A/spawn")
+
+        self._started = False
+        self._next_idx = 0
+        self._spawn_timer = None
 
         self.create_timer(1.0, self.start_once)
-        self._started = False
 
     def start_once(self):
         if self._started:
@@ -20,6 +23,7 @@ class JobSpawner(Node):
         if not self.cli_reset.wait_for_service(2.0):
             self.get_logger().error("reset_episode not available")
             return
+
         req = ResetEpisode.Request()
         req.num_packages = 20
         fut = self.cli_reset.call_async(req)
@@ -28,18 +32,36 @@ class JobSpawner(Node):
             self.get_logger().error(f"reset failed: {getattr(fut.result(),'error','?')}")
             return
 
-        if not self.cli_enqueue_a.wait_for_service(2.0):
-            self.get_logger().error("A enqueue not available")
+        if not self.cli_spawn_a.wait_for_service(2.0):
+            self.get_logger().error("/station/A/spawn not available")
             return
 
-        # spawn 20 packages into A input
-        for i in range(20):
-            er = Enqueue.Request()
-            er.package_idx = i
-            ef = self.cli_enqueue_a.call_async(er)
-            rclpy.spin_until_future_complete(self, ef, timeout_sec=1.0)
+        # spawn every 20 seconds
+        self._spawn_timer = self.create_timer(20.0, self.spawn_one)
+        self.get_logger().info("Spawner started: spawning 1 package every 20s")
 
-        self.get_logger().info("Spawned 20 packages to Station A")
+    def spawn_one(self):
+        if self._next_idx >= 20:
+            self.get_logger().info("All 20 packages spawned. Stopping spawner timer.")
+            if self._spawn_timer is not None:
+                self._spawn_timer.cancel()
+            return
+
+        req = Enqueue.Request()
+        req.package_idx = self._next_idx
+        fut = self.cli_spawn_a.call_async(req)
+        rclpy.spin_until_future_complete(self, fut, timeout_sec=2.0)
+
+        if fut.result() is None:
+            self.get_logger().error("spawn call failed")
+            return
+
+        if fut.result().result != "ACCEPTED":
+            self.get_logger().warn(f"spawn declined for idx={self._next_idx}: {fut.result().result}")
+            return
+
+        self.get_logger().info(f"Spawned package_idx={self._next_idx} at Station A")
+        self._next_idx += 1
 
 def main():
     rclpy.init()
