@@ -306,7 +306,7 @@ class StationNode(Node):
 
         goal_handle.succeed()
         result = Pick.Result()
-        result.result = "SUCCEEDED"
+        result.result = f"SUCCEEDED with {attempt} tries"
         result.package_idx = pkg
         self.emit_event("ACTION_RESULT", package_idx=pkg)
         return result
