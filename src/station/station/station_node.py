@@ -6,12 +6,17 @@ from interfaces.srv import Enqueue, Dequeue, SetPackageInfo, GetPackages
 from interfaces.action import Pick, Charge
 from interfaces.msg import WorldEvent, RobotState
 import time
+from rclpy.callback_groups import ReentrantCallbackGroup, MutuallyExclusiveCallbackGroup
+
 
 STATIONS = ["A","B","C","D","E","F","G"]
 
 class StationNode(Node):
     def __init__(self):
         super().__init__("station")
+        self.cb_group_srv = MutuallyExclusiveCallbackGroup()
+        self.cb_group_cli = ReentrantCallbackGroup()
+
         self.declare_parameter("station_id", "B")
         self.declare_parameter("seed", 0)
         self.declare_parameter("process_dt", 0.2)
@@ -20,8 +25,8 @@ class StationNode(Node):
         self.rng = random.Random(self.get_parameter("seed").get_parameter_value().integer_value)
         self.process_dt = float(self.get_parameter("process_dt").get_parameter_value().double_value)
 
-        self.cli_get_pkgs = self.create_client(GetPackages, "/get_packages")
-
+        self.cli_get_pkgs = self.create_client(GetPackages, "/get_packages", callback_group=self.cb_group_cli)
+        self.cli_set_pkg = self.create_client(SetPackageInfo, "/set_package_info", callback_group=self.cb_group_cli)
 
         if self.station_id not in STATIONS:
             raise RuntimeError("Invalid station_id")
@@ -39,31 +44,40 @@ class StationNode(Node):
         self.sub_robot = self.create_subscription(RobotState, "/robot_state", self.on_robot_state, 10)
         self.pub_event = self.create_publisher(WorldEvent, "/world_event", 10)
 
-        # Service clients
-        self.cli_set_pkg = self.create_client(SetPackageInfo, "/set_package_info")
 
         # Services for robot interaction
-        self.srv_enqueue = self.create_service(Enqueue, f"/robot_action/{self.station_id}/enqueue", self.on_enqueue)
-        self.srv_dequeue = self.create_service(Dequeue, f"/robot_action/{self.station_id}/dequeue", self.on_dequeue)
+        self.srv_enqueue = self.create_service(
+            Enqueue, f"/robot_action/{self.station_id}/enqueue", self.on_enqueue, callback_group=self.cb_group_srv
+        )
+        self.srv_dequeue = self.create_service(
+            Dequeue, f"/robot_action/{self.station_id}/dequeue", self.on_dequeue, callback_group=self.cb_group_srv
+        )
 
         # Service for Job spawn
         # Spawn service (only Station A) - NO robot-present gate
         self.srv_spawn = None
         if self.station_id == "A":
-            self.srv_spawn = self.create_service(Enqueue, "/station/A/spawn", self.on_spawn)
+            self.srv_spawn = self.create_service(
+                Enqueue, "/station/A/spawn", self.on_spawn, callback_group=self.cb_group_srv
+            )
 
 
         # Actions (only for A and F)
         self.pick_server = None
         self.charge_server = None
         if self.station_id == "A":
-            self.pick_server = ActionServer(self, Pick, "/robot_action/Station_A/pick", self.execute_pick)
+            self.pick_server = ActionServer(
+                self, Pick, "/robot_action/Station_A/pick", self.execute_pick, callback_group=self.cb_group_srv
+            )
         if self.station_id == "F":
-            self.charge_server = ActionServer(self, Charge, "/robot_action/Station_F/charge", self.execute_charge)
+            self.charge_server = ActionServer(
+                self, Charge, "/robot_action/Station_F/charge", self.execute_charge, callback_group=self.cb_group_srv
+            )
+
 
         # Autonomy loop for processing stations (B,C,D,E,G)
         if self.station_id in ["B","C","D","E","G"]:
-            self.timer = self.create_timer(self.process_dt, self.processing_step)
+            self.timer = self.create_timer(self.process_dt, self.processing_step, callback_group=self.cb_group_srv)
 
         self.emit_event("STATION_READY")
 
@@ -104,20 +118,41 @@ class StationNode(Node):
         return self.robot_location == self.station_id
 
     def set_pkg(self, package_idx: int, fields, values):
-        # sync call pattern (simple)
         if not self.cli_set_pkg.wait_for_service(timeout_sec=1.0):
             self.get_logger().error("set_package_info service not available")
             return False
+
         req = SetPackageInfo.Request()
         req.package_idx = int(package_idx)
         req.fields = list(fields)
         req.values = [str(v) for v in values]
+
         fut = self.cli_set_pkg.call_async(req)
-        rclpy.spin_until_future_complete(self, fut, timeout_sec=2.0)
-        if not fut.done() or fut.result() is None:
-            self.get_logger().error("set_package_info call failed")
+
+        # Wait without nested spinning
+        t0 = time.time()
+        while not fut.done():
+            if time.time() - t0 > 2.0:
+                self.get_logger().error("set_package_info call timed out (future not done)")
+                return False
+            time.sleep(0.01)
+
+        try:
+            res = fut.result()
+        except Exception as e:
+            self.get_logger().error(f"set_package_info call raised exception: {e}")
             return False
-        return fut.result().ok
+
+        if res is None:
+            self.get_logger().error("set_package_info returned None")
+            return False
+
+        if not res.ok:
+            self.get_logger().error(f"set_package_info rejected: {res.error}")
+            return False
+
+        return True
+
 
     # ---------------- Services ----------------
     def on_enqueue(self, req: Enqueue.Request, res: Enqueue.Response):
@@ -423,9 +458,20 @@ class StationNode(Node):
 def main():
     rclpy.init()
     node = StationNode()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
+
+    # Allow concurrent processing so service-client responses can be handled
+    # while we are inside another callback (e.g., on_spawn/processing_step).
+    from rclpy.executors import MultiThreadedExecutor
+    executor = MultiThreadedExecutor(num_threads=4)
+    executor.add_node(node)
+
+    try:
+        executor.spin()
+    finally:
+        executor.shutdown()
+        node.destroy_node()
+        rclpy.shutdown()
+
 
 if __name__ == "__main__":
     main()
