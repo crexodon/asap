@@ -1,0 +1,5 @@
+int32 requested_tick_id   # -1 means latest
+---
+bool ok
+string error
+interfaces/WorldSnapshot snapshot

@@ -1,0 +1,6 @@
+int32 package_idx
+string[] fields
+string[] values
+---
+bool ok
+string error
