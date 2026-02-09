@@ -32,7 +32,7 @@ class StationNode(Node):
             raise RuntimeError("Invalid station_id")
 
         self._tick_id = 0
-        self.robot_location = "A"
+        self.robot_location = "ON_TRANSIT"
         self.input_queue = []
         self.output_queue = []
         self.output_success_queue = []
