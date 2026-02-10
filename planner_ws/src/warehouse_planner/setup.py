@@ -11,7 +11,7 @@ setup(
         ("share/" + package_name, ["package.xml"]),
         ("share/" + package_name + "/launch", ["launch/planner.launch.py"]),
     ],
-    install_requires=["setuptools"],
+    install_requires=['setuptools', 'sb3-contrib', 'stable-baselines3'],
     zip_safe=True,
     maintainer="norika-schneider",
     maintainer_email="norika.schneider@gmail.com",
