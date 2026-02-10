@@ -82,6 +82,7 @@ class StationNode(Node):
         self.emit_event("STATION_READY")
 
     def on_robot_state(self, msg: RobotState):
+        self.emit_event("ROBOT_CHANGED_LOCATION")
         self.robot_location = msg.robot_location
     
     def on_spawn(self, req: Enqueue.Request, res: Enqueue.Response):
@@ -100,7 +101,7 @@ class StationNode(Node):
                     ["current_location", "lifecycle_state", "availability", "next_location"],
                     ["A", "READY", "true", "B"])
 
-        self.emit_event("QUEUE_CHANGED", package_idx=pkg)
+        self.emit_event("PACKAGE_SPAWNED", package_idx=pkg)
         return res
 
 
@@ -176,7 +177,7 @@ class StationNode(Node):
         else:
             self.set_pkg(pkg, ["current_location","lifecycle_state","availability"], [self.station_id, "WAITING", "false"])
 
-        self.emit_event("QUEUE_CHANGED", package_idx=pkg)
+        self.emit_event("ENQUEUED", package_idx=pkg)
         return res
 
     def on_dequeue(self, req: Dequeue.Request, res: Dequeue.Response):
@@ -209,7 +210,7 @@ class StationNode(Node):
 
         # picked up by robot
         self.set_pkg(pkg, ["current_location","availability"], ["ROBOT","false"])
-        self.emit_event("QUEUE_CHANGED", package_idx=pkg)
+        self.emit_event("DEQUEUED", package_idx=pkg)
         return res
     
     def get_pkg_lifecycle(self, package_idx: int) -> str | None:
@@ -219,16 +220,32 @@ class StationNode(Node):
 
         req = GetPackages.Request()
         req.all = True
+
         fut = self.cli_get_pkgs.call_async(req)
-        rclpy.spin_until_future_complete(self, fut, timeout_sec=2.0)
-        if not fut.done() or fut.result() is None:
-            self.get_logger().error("get_packages call failed")
+
+        t0 = time.time()
+        while not fut.done():
+            if time.time() - t0 > 2.0:
+                self.get_logger().error("get_packages call timed out (future not done)")
+                return None
+            time.sleep(0.01)
+
+        try:
+            res = fut.result()
+        except Exception as e:
+            self.get_logger().error(f"get_packages call raised exception: {e}")
             return None
 
-        for p in fut.result().packages:
+        if res is None:
+            self.get_logger().error("get_packages returned None")
+            return None
+
+        for p in res.packages:
             if int(p.package_idx) == int(package_idx):
                 return str(p.lifecycle_state)
+
         return None
+
 
 
     # ---------------- Actions ----------------
@@ -281,7 +298,7 @@ class StationNode(Node):
                     result = Pick.Result()
                     result.result = "ABORTED_LEFT_STATION"
                     result.package_idx = pkg
-                    self.emit_event("ACTION_RESULT", package_idx=pkg)
+                    self.emit_event("PICK_A_FAILED", package_idx=pkg)
                     return result
 
                 elapsed = time.time() - t0
@@ -308,7 +325,7 @@ class StationNode(Node):
         result = Pick.Result()
         result.result = f"SUCCEEDED with {attempt} tries"
         result.package_idx = pkg
-        self.emit_event("ACTION_RESULT", package_idx=pkg)
+        self.emit_event("PICK_A_SUCCESS", package_idx=pkg)
         return result
 
 
@@ -336,7 +353,7 @@ class StationNode(Node):
                 result = Charge.Result()
                 result.result = "ABORTED_LEFT_STATION"
                 result.battery = float(b)
-                self.emit_event("ACTION_RESULT")
+                self.emit_event("CHARGE_ABORTED")
                 return result
             b = min(target, b + 0.02)
             fb = Charge.Feedback()
@@ -348,7 +365,7 @@ class StationNode(Node):
         result = Charge.Result()
         result.result = "SUCCEEDED"
         result.battery = float(b)
-        self.emit_event("ACTION_RESULT")
+        self.emit_event("CHARGE_FINISHED")
         return result
 
     # ---------------- Processing loop (B,C,D,E,G) ----------------
@@ -369,8 +386,7 @@ class StationNode(Node):
                     # terminal: keep FAILED and send to FINISH
                     self.set_pkg(pkg, ["next_location", "availability"], ["FINISH", "false"])
 
-                    self.emit_event("PROCESS_FINISHED", package_idx=pkg)
-                    self.emit_event("QUEUE_CHANGED", package_idx=pkg)
+                    self.emit_event("PUT_FAILED_TO_STORE", package_idx=pkg)
                     return
 
             self.processing_state = "RUNNING"
@@ -453,7 +469,6 @@ class StationNode(Node):
                 self.set_pkg(pkg, ["next_location","lifecycle_state","availability"], ["FINISH","FAILED","false"])
 
         self.emit_event("PROCESS_FINISHED", package_idx=pkg)
-        self.emit_event("QUEUE_CHANGED", package_idx=pkg)
 
 def main():
     rclpy.init()
