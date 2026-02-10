@@ -102,6 +102,7 @@ class StationNode(Node):
                     ["A", "READY", "true", "B"])
 
         self.emit_event("PACKAGE_SPAWNED", package_idx=pkg)
+        self.emit_event("PROCESS_FINISHED", package_idx=pkg)
         return res
 
 
@@ -344,27 +345,36 @@ class StationNode(Node):
             return result
 
         # Battery model placeholder: pretend battery increases over time; RobotInterface owns real battery later.
-        target = float(goal_handle.request.target_battery)
-        b = 0.5
-        rate = self.create_rate(10)
-        while b < target:
-            if not self.robot_present():
-                goal_handle.abort()
-                result = Charge.Result()
-                result.result = "ABORTED_LEFT_STATION"
-                result.battery = float(b)
-                self.emit_event("CHARGE_ABORTED")
-                return result
-            b = min(target, b + 0.02)
+        current_battery_status = float(goal_handle.request.current_battery_status)
+        rate = 10 # 10 per second
+        max_battery_status = 100
+        dt = 1 # feedback in 1 s steps
+        charge_time = 0
+        while current_battery_status < max_battery_status:
+            t0 = time.time()
+            while (time.time()- t0) < dt:
+                if not self.robot_present():
+                    goal_handle.abort()
+                    result = Charge.Result()
+                    result.result = "ABORTED_LEFT_STATION"
+                    result.battery = float(current_battery_status)
+                    self.emit_event("CHARGE_ABORTED")
+                    return result
+            charge_time += dt
+            current_battery_status += rate/dt
             fb = Charge.Feedback()
-            fb.battery = float(b)
+            fb.battery = float(current_battery_status)
             goal_handle.publish_feedback(fb)
-            rate.sleep()
+            # rate.sleep()
+
+        if current_battery_status > max_battery_status:
+            current_battery_status = max_battery_status
 
         goal_handle.succeed()
         result = Charge.Result()
         result.result = "SUCCEEDED"
-        result.battery = float(b)
+        result.battery = float(current_battery_status)
+        result.dt = float(charge_time)
         self.emit_event("CHARGE_FINISHED")
         return result
 

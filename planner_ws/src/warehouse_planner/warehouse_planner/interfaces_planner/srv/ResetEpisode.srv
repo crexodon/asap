@@ -1,0 +1,4 @@
+int32 num_packages
+---
+bool ok
+string error
