@@ -14,6 +14,9 @@ from interfaces.msg import RobotState, WorldEvent
 from interfaces.srv import Enqueue, Dequeue, ResetEpisode
 from interfaces.action import Pick, Charge, PlannerCmd
 
+from action_msgs.msg import GoalStatus
+
+
 
 
 STATION_COORDS: Dict[str, Tuple[float, float]] = {
@@ -173,6 +176,16 @@ class WarehouseRobotNode(Node):
                 return False
             time.sleep(0.05)
         return True
+    
+    def _wait_future(self, fut, timeout_s: float, name: str) -> bool:
+        t0 = time.time()
+        while rclpy.ok() and not fut.done():
+            if time.time() - t0 > timeout_s:
+                self.get_logger().error(f"Timeout waiting for {name}")
+                return False
+            time.sleep(0.01)
+        return fut.done()
+
 
     def _call_enqueue(self, station_id: str, package_idx: int) -> Enqueue.Response:
         cli = self.cli_enqueue[station_id]
@@ -181,8 +194,10 @@ class WarehouseRobotNode(Node):
         req = Enqueue.Request()
         req.package_idx = int(package_idx)
         fut = cli.call_async(req)
-        rclpy.spin_until_future_complete(self, fut)
+        if not self._wait_future(fut, 5.0, f"enqueue({station_id})"):
+            raise RuntimeError("enqueue service timeout")
         return fut.result()
+
 
     def _call_dequeue(self, station_id: str, package_idx: int) -> Dequeue.Response:
         cli = self.cli_dequeue[station_id]
@@ -191,28 +206,40 @@ class WarehouseRobotNode(Node):
         req = Dequeue.Request()
         req.package_idx = int(package_idx)
         fut = cli.call_async(req)
-        rclpy.spin_until_future_complete(self, fut)
+        if not self._wait_future(fut, 5.0, f"enqueue({station_id})"):
+            raise RuntimeError("enqueue service timeout")
         return fut.result()
-
+    
     def _do_pick_a(self, package_idx: int) -> Tuple[str, int, float]:
-        if not self.ac_pick_a.server_is_ready():
-            self.ac_pick_a.wait_for_server(timeout_sec=5.0)
+        if not self.ac_pick_a.wait_for_server(timeout_sec=5.0):
+            return "FAIL no pick_a server", -1, 0.0
 
         goal = Pick.Goal()
         goal.package_idx = int(package_idx)
 
         t0 = time.time()
+
         goal_fut = self.ac_pick_a.send_goal_async(goal)
-        rclpy.spin_until_future_complete(self, goal_fut)
+        if not self._wait_future(goal_fut, 5.0, "pick_a send_goal"):
+            return "FAIL send_goal timeout", -1, 0.0
         goal_handle = goal_fut.result()
         if goal_handle is None or not goal_handle.accepted:
-            return "FAIL while picking", -1, 0.0
+            return "FAIL not accepted", -1, 0.0
 
         res_fut = goal_handle.get_result_async()
-        rclpy.spin_until_future_complete(self, res_fut)
+        if not self._wait_future(res_fut, 60.0, "pick_a result"):
+            return "FAIL result timeout", -1, 0.0
+
         res = res_fut.result()
+        status_ok = (res.status == GoalStatus.STATUS_SUCCEEDED)
+        result_msg = str(res.result.result).strip()
+        picked = int(res.result.package_idx)
+
         dt = float(time.time() - t0)
-        return str(res.result.result), int(res.result.package_idx), dt
+
+        # Gib beides zurück
+        return status_ok, result_msg, picked, dt
+
 
     def _do_charge(self) -> Tuple[str, float, float]:
         if not self.ac_charge.server_is_ready():
@@ -341,7 +368,7 @@ class WarehouseRobotNode(Node):
             self.publish_state()
 
             try:
-                resp = self._call_enqueue(station, pkg)
+                resp = self._call_dequeue(station, pkg)
                 ok = str(resp.result) == "ACCEPTED"
                 if ok:
                     self.carrying_idx = int(resp.actual_package_idx)
@@ -366,7 +393,7 @@ class WarehouseRobotNode(Node):
             if len(parts) != 2:
                 goal_handle.abort()
                 res = PlannerCmd.Result()
-                res.result = "FAIL"
+                res.result = "FAIL no package_idx given"
                 res.dt = 0.0
                 return res
             try:
@@ -374,7 +401,7 @@ class WarehouseRobotNode(Node):
             except ValueError:
                 goal_handle.abort()
                 res = PlannerCmd.Result()
-                res.result = "FAIL"
+                res.result = "FAIL package_idx no integer"
                 res.dt = 0.0
                 return res
 
@@ -382,7 +409,7 @@ class WarehouseRobotNode(Node):
             if station not in STATION_COORDS:
                 goal_handle.abort()
                 res = PlannerCmd.Result()
-                res.result = "FAIL"
+                res.result = "FAIL location not valid"
                 res.dt = 0.0
                 return res
 
@@ -390,7 +417,7 @@ class WarehouseRobotNode(Node):
             self.publish_state()
 
             try:
-                resp = self._call_dequeue(station, pkg)
+                resp = self._call_enqueue(station, pkg)
                 ok = str(resp.result) == "ACCEPTED"
                 if ok:
                     self.carrying_idx = -1
@@ -408,6 +435,7 @@ class WarehouseRobotNode(Node):
             res = PlannerCmd.Result()
             res.result = "OK" if ok else "FAIL"
             res.dt = dt
+            self.get_logger().info(f"DROP result raw result_str={ok} picked_pkg={picked_pkg} dt={dt}")
             return res
 
         # PICK_A k
@@ -430,8 +458,8 @@ class WarehouseRobotNode(Node):
             self.robot_mode = "BUSY"
             self.publish_state()
 
-            result_str, picked_pkg, dt = self._do_pick_a(pkg)
-            ok = (result_str == "SUCCEEDED")
+            status_ok, result_str, picked_pkg, dt = self._do_pick_a(pkg)
+            ok = status_ok
             if ok:
                 self.carrying_idx = int(picked_pkg)
             self._drain_battery(dt)
@@ -443,6 +471,9 @@ class WarehouseRobotNode(Node):
             res = PlannerCmd.Result()
             res.result = "OK" if ok else "FAIL picking action failed"
             res.dt = float(dt)
+
+            self.get_logger().info(f"PICK_A raw result_str={result_str} picked_pkg={picked_pkg} dt={dt}")
+
             return res
 
         # CHARGE
