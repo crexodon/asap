@@ -1,12 +1,16 @@
 <?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>warehouse_robot</name>
-  <version>0.1.0</version>
-  <description>Discrete training robot node implementing /planner/cmd without Gazebo.</description>
-  <maintainer email="n/a">Noris_ASAP</maintainer>
-  <license>MIT</license>
+  <version>0.0.0</version>
+  <description>Robot Model for testing</description>
+  <maintainer email="norika.schneider@gmail.com">norika-schneider</maintainer>
+  <license>TODO: License declaration</license>
 
-  <buildtool_depend>ament_python</buildtool_depend>
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+  <test_depend>python3-pytest</test_depend>
 
   <exec_depend>rclpy</exec_depend>
   <exec_depend>interfaces</exec_depend>
