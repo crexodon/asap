@@ -13,6 +13,9 @@ from rclpy.node import Node
 from interfaces.msg import RobotState, WorldEvent
 from interfaces.srv import GetPackages, ResetEpisode
 
+import numpy as np
+
+
 try:
     # Expected by your specification
     from interfaces.action import PlannerCmd
