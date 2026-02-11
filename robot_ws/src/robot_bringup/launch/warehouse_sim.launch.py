@@ -54,10 +54,13 @@ def generate_launch_description():
     )
     
     # Bridge: Gazebo topics <-> ROS2 topics
+    # [ = bridge from gz to ros
+    # ] = bridge from ros to gz
+    # @ = bidirectional bridge
     gz_ros_bridge = Node(
         package='ros_gz_bridge',
         executable='parameter_bridge',
-        name='gz_ros_bridge',
+        name='gz_bridge',
         arguments=[
             # Odometry: Gazebo -> ROS2
             '/model/vehicle/odometry@nav_msgs/msg/Odometry[gz.msgs.Odometry',
