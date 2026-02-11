@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+import math
 from typing import Any, Dict, Optional, Tuple
 
 import gymnasium as gym
@@ -85,27 +86,64 @@ class WarehouseMDPEnv(gym.Env):
             )
         return st.as_dict()
 
-    def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None):
+    def reset(self, seed: int | None = None, options: dict | None = None):
         super().reset(seed=seed)
 
-        # Reset episode in simulation
-        self.ros.reset_episode(num_packages=20)
+        # 1) Reset the world (job_handler emits EPISODE_RESET; robot/stations/spawner react)
+        # Avoid doing this if the caller explicitly disabled it
+        do_reset = True
+        if options and isinstance(options, dict):
+            do_reset = bool(options.get("do_reset", True))
 
-        # Wait until battery restored to 100 (as specified)
+        if do_reset:
+            # You can make num_packages configurable; for now fixed 20
+            ok = self.ros.reset_episode(num_packages=20, timeout_s=5.0)
+            if not ok:
+                raise RuntimeError("Env.reset(): /reset_episode returned False")
+
+        # 2) Wait until the world is "ready enough" for an initial observation:
+        # - have robot_state
+        # - have packages list (len == 20)
         t0 = time.monotonic()
-        while time.monotonic() - t0 < 5.0:
-            if self.ros.wait_for_robot_state(timeout_s=0.1):
-                with self.ros._robot_state_lock:
-                    rs = self.ros._robot_state
-                if rs is not None and float(rs.battery) >= 100.0:
-                    break
-            time.sleep(0.05)
+        timeout_s = 5.0
 
-        self._last_step_time = time.monotonic()
-        self._last_delta_time = 0.0
-        self._last_obs = self._get_obs(delta_time=0.0)
-        info = {}
-        return self._last_obs, info
+        last_err = None
+        while time.monotonic() - t0 < timeout_s:
+            try:
+                # Ensure we have at least one robot_state cached
+                if not self.ros.wait_for_robot_state(timeout_s=0.2):
+                    time.sleep(0.02)
+                    continue
+
+                # Ensure get_packages works and returns full set
+                pkgs_res = self.ros.get_packages(timeout_s=2.0)
+                if pkgs_res is None:
+                    time.sleep(0.02)
+                    continue
+                if not hasattr(pkgs_res, "packages"):
+                    time.sleep(0.02)
+                    continue
+                if len(pkgs_res.packages) != 20:
+                    time.sleep(0.02)
+                    continue
+
+                # Ready
+                break
+
+            except Exception as e:
+                last_err = e
+                time.sleep(0.05)
+                continue
+        else:
+            # If we get here, timeout.
+            # Fail loudly: training on a half-reset world is worse than stopping.
+            raise RuntimeError(f"Env.reset() timed out waiting for robot_state/packages. last_err={last_err}")
+
+        # 3) Build obs with delta_time = 0.0 at the beginning of episode
+        obs = self._get_obs(delta_time=0.0)
+        info = {"reset_ok": True}
+        return obs, info
+
 
     def step(self, action: int):
         atype, param = flat_to_type_param(int(action))

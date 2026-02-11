@@ -1,13 +1,19 @@
 import rclpy
 from rclpy.node import Node
 from interfaces.srv import ResetEpisode, Enqueue
+from interfaces.msg import WorldEvent
 
 
 class JobSpawner(Node):
     def __init__(self):
         super().__init__("job_spawner")
+        self.sub_event = self.create_subscription(
+            WorldEvent,
+            "/world_event",
+            self.on_world_event,
+            10
+        )
 
-        self.cli_reset = self.create_client(ResetEpisode, "/reset_episode")
         self.cli_spawn_a = self.create_client(Enqueue, "/station/A/spawn")
 
         self._started = False
@@ -17,6 +23,14 @@ class JobSpawner(Node):
         # one-shot kick after startup
         self._start_timer = self.create_timer(1.0, self.start_once)
 
+    def on_world_event(self, msg):
+        if msg.event_type == "EPISODE_RESET":
+            self._next_idx = 0
+            if self._spawn_timer:
+                self._spawn_timer.cancel()
+            self._spawn_timer = self.create_timer(20.0, self.spawn_one)
+
+
     def start_once(self):
         if self._started:
             return
@@ -25,42 +39,24 @@ class JobSpawner(Node):
         # stop this one-shot timer
         if self._start_timer is not None:
             self._start_timer.cancel()
-
-        if not self.cli_reset.wait_for_service(timeout_sec=5.0):
-            self.get_logger().error("reset_episode not available")
-            return
-
-        req = ResetEpisode.Request()
-        req.num_packages = 20
-
-        fut = self.cli_reset.call_async(req)
-        fut.add_done_callback(self._on_reset_done)
-
-    def _on_reset_done(self, fut):
-        try:
-            res = fut.result()
-        except Exception as e:
-            self.get_logger().error(f"reset service call raised exception: {e}")
-            return
-
-        if res is None:
-            self.get_logger().error("reset failed: service returned None")
-            return
-
-        if not res.ok:
-            self.get_logger().error(f"reset failed: {res.error}")
-            return
-
-        self.get_logger().info("Reset succeeded")
-
+        # The planner controls episode boundaries.
         if not self.cli_spawn_a.wait_for_service(timeout_sec=5.0):
             self.get_logger().error("/station/A/spawn not available")
             return
+        self.get_logger().info("JobSpawner ready. Waiting for EPISODE_RESET to start spawning.")
 
-        # spawn every 20 seconds
+    def on_world_event(self, msg: WorldEvent):
+        if msg.event_type != "EPISODE_RESET":
+            return
+        # reset internal spawner state
+        self._next_idx = 0
+        if self._spawn_timer is not None:
+            self._spawn_timer.cancel()
+            self._spawn_timer = None
+        # spawn every 20 seconds (restart)
         self._spawn_timer = self.create_timer(20.0, self.spawn_one)
-        self.get_logger().info("Spawner started: spawning 1 package every 20s")
-
+        self.get_logger().info("EPISODE_RESET received -> Spawner restarted (1 package every 20s)")
+    
     def spawn_one(self):
         if self._next_idx >= 20:
             self.get_logger().info("All 20 packages spawned. Stopping spawner timer.")

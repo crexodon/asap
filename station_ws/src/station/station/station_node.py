@@ -21,6 +21,8 @@ class StationNode(Node):
         self.declare_parameter("seed", 0)
         self.declare_parameter("process_dt", 0.2)
 
+        self.sub_event = self.create_subscription(WorldEvent, "/world_event", self.on_world_event, 10)
+
         self.station_id = self.get_parameter("station_id").get_parameter_value().string_value
         self.rng = random.Random(self.get_parameter("seed").get_parameter_value().integer_value)
         self.process_dt = float(self.get_parameter("process_dt").get_parameter_value().double_value)
@@ -80,6 +82,25 @@ class StationNode(Node):
             self.timer = self.create_timer(self.process_dt, self.processing_step, callback_group=self.cb_group_srv)
 
         self.emit_event("STATION_READY")
+
+
+    def on_world_event(self, msg: WorldEvent):
+        if msg.event_type != "EPISODE_RESET":
+            return
+        self.reset_local_state()
+
+    def reset_local_state(self):
+        # Clear all internal queues/state so episode reset is consistent
+        self.input_queue.clear()
+        self.output_queue.clear()
+        self.output_success_queue.clear()
+        self.output_failed_queue.clear()
+        self.processing_idx = -1
+        self.processing_state = "IDLE"
+        self._remaining = 0.0
+        # make robot_present() false until robot publishes a fresh state
+        self.robot_location = "ON_TRANSIT"
+        self.emit_event("STATION_RESET")   
 
     def on_robot_state(self, msg: RobotState):
         self.robot_location = msg.robot_location

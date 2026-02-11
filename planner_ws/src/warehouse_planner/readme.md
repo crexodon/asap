@@ -43,20 +43,26 @@ This package expects these Python libs to be available in your environment:
 
 1. Create and activate virtual environment
 ```bash
-python3 -m venv ros2-asap
+mkdir -p ~/colcon_venv/src
 ```
 ```bash
-source ros2-asap/bin/activate
+cd ~/colcon_venv/
 ```
-
-2. Source ROS 2
 ```bash
-source /opt/ros/jazzy/setup.bash
+virtualenv -p python3 ./venv
+```
+```bash
+source ./venv/bin/activate
 ```
 
-3. Install Dependencies:
+2. Install Dependencies:
 ```bash
 pip install stable-baselines3 sb3-contrib torch gymnasium numpy
+```
+
+3. Source
+```bash
+source /opt/ros/jazzy/setup.bash
 ```
 
 ## Run (inference)

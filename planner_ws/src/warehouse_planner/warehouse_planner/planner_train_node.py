@@ -9,6 +9,8 @@ from rclpy.executors import MultiThreadedExecutor
 from .env import WarehouseMDPEnv
 from .ros_interface import WarehouseROSInterface
 
+import time
+
 
 def _resolve_default_model_dir() -> Path:
     """Prefer package share/models, fallback to CWD."""
@@ -75,8 +77,19 @@ def main():
         spin_thread = threading.Thread(target=executor.spin, daemon=True)
         spin_thread.start()
 
+        # --- IMPORTANT: one clean reset at startup ---
+        # Ensures job_handler emits EPISODE_RESET and all nodes (robot/stations/spawner) synchronize.
+        ros.get_logger().info("Triggering initial /reset_episode before training ...")
+        try:
+            ros.reset_episode(num_packages=20, timeout_s=5.0)
+        except Exception as e:
+            ros.get_logger().error(f"Initial reset failed: {e}")
+            raise
+        # Give the system a short moment to process EPISODE_RESET and publish fresh robot_state
+        time.sleep(0.2)
+
         ros.get_logger().info(f"Training for total_timesteps={total_timesteps} ...")
-        model.learn(total_timesteps=total_timesteps, progress_bar=True)
+        model.learn(total_timesteps=total_timesteps, progress_bar=False)
 
         ros.get_logger().info(f"Saving model to: {model_path}")
         model.save(str(model_path))
