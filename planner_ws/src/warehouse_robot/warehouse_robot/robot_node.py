@@ -241,24 +241,47 @@ class WarehouseRobotNode(Node):
         return status_ok, result_msg, picked, dt
 
 
-    def _do_charge(self) -> Tuple[str, float, float]:
-        if not self.ac_charge.server_is_ready():
-            self.ac_charge.wait_for_server(timeout_sec=5.0)
+    def _do_charge(self) -> Tuple[bool, str, float, float]:
+        """
+        Returns:
+        (status_ok, result_msg, new_battery, dt)
+        """
+        if not self.ac_charge.wait_for_server(timeout_sec=5.0):
+            return False, "FAIL no charge server", float(self.battery_status), 0.0
 
         goal = Charge.Goal()
         goal.current_battery_status = float(self.battery_status)
 
+        t0 = time.time()
+
+        # Send goal
         goal_fut = self.ac_charge.send_goal_async(goal)
-        rclpy.spin_until_future_complete(self, goal_fut)
+        if not self._wait_future(goal_fut, 5.0, "charge send_goal"):
+            return False, "FAIL send_goal timeout", float(self.battery_status), 0.0
+
         goal_handle = goal_fut.result()
         if goal_handle is None or not goal_handle.accepted:
-            return "FAIL", float(self.battery_status), 0.0
+            return False, "FAIL not accepted", float(self.battery_status), 0.0
 
+        # Wait for result
         res_fut = goal_handle.get_result_async()
-        rclpy.spin_until_future_complete(self, res_fut)
+        # Charging can take longer; adjust if needed
+        if not self._wait_future(res_fut, 120.0, "charge result"):
+            return False, "FAIL result timeout", float(self.battery_status), float(time.time() - t0)
+
         res = res_fut.result()
-        dt = float(getattr(res.result, "dt", 0.0))
-        return str(res.result.result), float(res.result.battery), dt
+        status_ok = (res.status == GoalStatus.STATUS_SUCCEEDED)
+
+        # Extract payload
+        result_msg = str(res.result.result).strip()
+        new_battery = float(getattr(res.result, "battery", self.battery_status))
+
+        # Prefer dt from action result if present; else wall time
+        dt_from_msg = float(getattr(res.result, "dt", 0.0))
+        dt = dt_from_msg if dt_from_msg > 0.0 else float(time.time() - t0)
+
+        return status_ok, result_msg, new_battery, dt
+
 
     def execute_cmd(self, goal_handle):
         cmd = str(goal_handle.request.cmd).strip()
@@ -435,7 +458,6 @@ class WarehouseRobotNode(Node):
             res = PlannerCmd.Result()
             res.result = "OK" if ok else "FAIL"
             res.dt = dt
-            self.get_logger().info(f"DROP result raw result_str={ok} picked_pkg={picked_pkg} dt={dt}")
             return res
 
         # PICK_A k
@@ -481,8 +503,8 @@ class WarehouseRobotNode(Node):
             self.robot_mode = "BUSY"
             self.publish_state()
 
-            result_str, new_batt, dt = self._do_charge()
-            ok = (result_str == "SUCCEEDED")
+            status_ok, result_str, new_batt, dt = self._do_charge()
+            ok = status_ok
             if ok:
                 self.battery_status = float(new_batt)
             self.robot_mode = "IDLE"
@@ -492,6 +514,7 @@ class WarehouseRobotNode(Node):
             res = PlannerCmd.Result()
             res.result = "OK" if ok else "FAIL"
             res.dt = float(dt)
+            self.get_logger().info(f"PICK_A raw result_str={result_str} dt={dt}")
             return res
 
         # Unknown command
