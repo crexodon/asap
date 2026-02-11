@@ -1,7 +1,0 @@
-float32 current_battery_status  # e.g. 30
----
-string result
-float32 battery
-float32 dt
----
-float32 battery
