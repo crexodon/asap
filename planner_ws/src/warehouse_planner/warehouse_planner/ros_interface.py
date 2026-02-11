@@ -222,7 +222,7 @@ class WarehouseROSInterface(Node):
 
         send_future.add_done_callback(_done_cb)
 
-    def wait_for_interrupt_event(self, timeout_s: Optional[float] = None) -> float:
+    def wait_for_interrupt_event(self, timeout_s: Optional[float] = None) -> Optional[float]:
         """Block until first PROCESS_STARTED/FINISHED event arrives.
 
         Returns real elapsed seconds spent waiting.
@@ -238,6 +238,8 @@ class WarehouseROSInterface(Node):
                 while self._last_interrupt_event_time is None and time.monotonic() < deadline:
                     self._event_cv.wait(timeout=0.25)
             t1 = time.monotonic()
+        if self._last_interrupt_event_time is None and timeout_s is not None:
+            return None
         return float(t1 - t0)
 
     def build_encoded_state(self, delta_time: float) -> Optional[EncodedState]:

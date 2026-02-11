@@ -155,7 +155,12 @@ class WarehouseMDPEnv(gym.Env):
         # Execute action
         if atype == 0:  # WAIT
             self.ros.send_wait_for_logging()
-            dt = self.ros.wait_for_interrupt_event(timeout_s=None)
+            waited = self.ros.wait_for_interrupt_event(timeout_s=1.0)
+            # If no event occurred, force a bounded WAIT duration so agent can act again
+            dt = float(waited) if waited is not None else 1.0
+            if dt is None:
+                dt = 1.0
+
         elif atype == 1:  # CHARGE
             res = self.ros.send_cmd("CHARGE")
             dt = res.dt
