@@ -8,9 +8,10 @@
 
   <buildtool_depend>ament_python</buildtool_depend>
 
-  <depend>rclpy</depend>
-  <depend>interfaces</depend>
-
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>interfaces</exec_depend>
+  <depend>std_msgs</depend>
+  <depend>action_msgs</depend>
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
 
