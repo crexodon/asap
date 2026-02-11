@@ -12,7 +12,8 @@ from rclpy.executors import MultiThreadedExecutor
 
 from interfaces.msg import RobotState, WorldEvent
 from interfaces.srv import Enqueue, Dequeue, ResetEpisode
-from interfaces.action import PlannerCmd, Pick, Charge
+from interfaces.action import Pick, Charge, PlannerCmd
+
 
 
 STATION_COORDS: Dict[str, Tuple[float, float]] = {
@@ -205,7 +206,7 @@ class WarehouseRobotNode(Node):
         rclpy.spin_until_future_complete(self, goal_fut)
         goal_handle = goal_fut.result()
         if goal_handle is None or not goal_handle.accepted:
-            return "FAIL", -1, 0.0
+            return "FAIL while picking", -1, 0.0
 
         res_fut = goal_handle.get_result_async()
         rclpy.spin_until_future_complete(self, res_fut)
@@ -414,7 +415,7 @@ class WarehouseRobotNode(Node):
             if len(parts) != 2:
                 goal_handle.abort()
                 res = PlannerCmd.Result()
-                res.result = "FAIL"
+                res.result = "FAIL no package_idx"
                 res.dt = 0.0
                 return res
             try:
@@ -422,7 +423,7 @@ class WarehouseRobotNode(Node):
             except ValueError:
                 goal_handle.abort()
                 res = PlannerCmd.Result()
-                res.result = "FAIL"
+                res.result = "FAIL package_idx not readable"
                 res.dt = 0.0
                 return res
 
@@ -440,7 +441,7 @@ class WarehouseRobotNode(Node):
 
             (goal_handle.succeed() if ok else goal_handle.abort())
             res = PlannerCmd.Result()
-            res.result = "OK" if ok else "FAIL"
+            res.result = "OK" if ok else "FAIL picking action failed"
             res.dt = float(dt)
             return res
 

@@ -82,7 +82,6 @@ class StationNode(Node):
         self.emit_event("STATION_READY")
 
     def on_robot_state(self, msg: RobotState):
-        self.emit_event("ROBOT_CHANGED_LOCATION")
         self.robot_location = msg.robot_location
     
     def on_spawn(self, req: Enqueue.Request, res: Enqueue.Response):
