@@ -53,9 +53,14 @@ class JobSpawner(Node):
         if self._spawn_timer is not None:
             self._spawn_timer.cancel()
             self._spawn_timer = None
+
+        # spawn first package directly
+        self.get_logger().info("EPISODE_RESET received -> Spawning first package immediately.")
+        self.spawn_one()
+
         # spawn every 20 seconds (restart)
         self._spawn_timer = self.create_timer(20.0, self.spawn_one)
-        self.get_logger().info("EPISODE_RESET received -> Spawner restarted (1 package every 20s)")
+        self.get_logger().info("Spawner interval started (next package in 20s)")
     
     def spawn_one(self):
         if self._next_idx >= 20:
