@@ -22,3 +22,6 @@ SHIPPING_TYPES = ["standard", "express"]
 
 # Package location includes ROBOT + stations
 PACKAGE_LOCATIONS = STATIONS + ["ROBOT"]
+
+# Next-location for packages can be station id or FINISH
+NEXT_LOCATIONS = STATIONS + ["FINISH"]

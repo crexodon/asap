@@ -27,6 +27,7 @@ from .encoding import (
     EncodedState,
     LIFECYCLE_TO_IDX,
     PACKAGE_LOCATION_TO_IDX,
+    NEXT_LOCATION_TO_IDX,
     ROBOT_LOCATION_TO_IDX,
     SHIPPING_TO_IDX,
     safe_idx,
@@ -269,7 +270,7 @@ class WarehouseROSInterface(Node):
                 continue
             loc[i] = safe_idx(PACKAGE_LOCATION_TO_IDX, str(p.current_location), 0)
             # next_location is station id or "FINISH"
-            nxt[i] = safe_idx(PACKAGE_LOCATION_TO_IDX, str(p.next_location), 0)
+            nxt[i] = safe_idx(NEXT_LOCATION_TO_IDX, str(p.next_location), 0)
             ship[i] = safe_idx(SHIPPING_TO_IDX, str(p.shipping_type), 0)
             life[i] = safe_idx(LIFECYCLE_TO_IDX, str(p.lifecycle_state), 0)
             avail[i] = 1 if bool(p.availability) else 0

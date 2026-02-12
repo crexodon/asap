@@ -8,6 +8,7 @@ import numpy as np
 from .constants import (
     LIFECYCLE_STATES,
     PACKAGE_LOCATIONS,
+    NEXT_LOCATIONS,
     ROBOT_LOCATIONS,
     SHIPPING_TYPES,
     STATIONS,
@@ -20,6 +21,7 @@ def _make_map(items: List[str]) -> Dict[str, int]:
 
 ROBOT_LOCATION_TO_IDX = _make_map(ROBOT_LOCATIONS)
 PACKAGE_LOCATION_TO_IDX = _make_map(PACKAGE_LOCATIONS)
+NEXT_LOCATION_TO_IDX = _make_map(NEXT_LOCATIONS)
 STATION_TO_IDX = _make_map(STATIONS)
 SHIPPING_TO_IDX = _make_map(SHIPPING_TYPES)
 LIFECYCLE_TO_IDX = _make_map(LIFECYCLE_STATES)

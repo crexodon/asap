@@ -41,6 +41,7 @@ class WarehouseMDPEnv(gym.Env):
                 "battery_status": gym.spaces.Box(low=0.0, high=100.0, shape=(1,), dtype=np.float32),
                 "robot_location": gym.spaces.Box(low=0, high=7, shape=(1,), dtype=np.int64),
                 "robot_carrying_idx": gym.spaces.Box(low=-1, high=19, shape=(1,), dtype=np.int64),
+                "episode_step": gym.spaces.Box(low=0, high=1_000_000, shape=(1,), dtype=np.int64),
                 "delta_time": gym.spaces.Box(low=0.0, high=1e6, shape=(1,), dtype=np.float32),
                 "package_location": gym.spaces.Box(low=0, high=7, shape=(20,), dtype=np.int64),
                 "package_next_station": gym.spaces.Box(low=0, high=7, shape=(20,), dtype=np.int64),
@@ -49,6 +50,11 @@ class WarehouseMDPEnv(gym.Env):
                 "package_availability": gym.spaces.Box(low=0, high=1, shape=(20,), dtype=np.int64),
             }
         )
+
+        self._episode_step: int = 0
+        # Forced prefix actions per episode:
+        # 0) MOVE_TO A, 1) PICK_A 0, 2) MOVE_TO B, 3) DROP 0
+        self._forced_prefix_actions = [40, 100, 41, 80]
 
         self._last_step_time = time.monotonic()
         self._last_delta_time = 0.0
@@ -84,7 +90,9 @@ class WarehouseMDPEnv(gym.Env):
                 package_lifecycle_state=np.zeros((20,), dtype=np.int64),
                 package_availability=np.zeros((20,), dtype=np.int64),
             )
-        return st.as_dict()
+        obs = st.as_dict()
+        obs["episode_step"] = np.array([self._episode_step], dtype=np.int64)
+        return obs
 
     def reset(self, seed: int | None = None, options: dict | None = None):
         super().reset(seed=seed)
@@ -140,17 +148,22 @@ class WarehouseMDPEnv(gym.Env):
             raise RuntimeError(f"Env.reset() timed out waiting for robot_state/packages. last_err={last_err}")
 
         # 3) Build obs with delta_time = 0.0 at the beginning of episode
+        self._episode_step = 0
         obs = self._get_obs(delta_time=0.0)
         info = {"reset_ok": True}
         return obs, info
 
 
     def step(self, action: int):
+        if self._episode_step < len(self._forced_prefix_actions):
+            action = int(self._forced_prefix_actions[self._episode_step])
         atype, param = flat_to_type_param(int(action))
 
         dt = 0.0
         terminated = False
         truncated = False
+
+
 
         # Execute action
         if atype == 0:  # WAIT
@@ -202,4 +215,5 @@ class WarehouseMDPEnv(gym.Env):
         self._last_step_time = time.monotonic()
         self._last_obs = self._get_obs(delta_time=dt)
         info = {"dt": float(dt)}
+        self._episode_step += 1
         return self._last_obs, reward, terminated, truncated, info
