@@ -8,6 +8,7 @@ from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 
 def generate_launch_description():
     pkg_name = 'warehouse_simulation'
+    pkg_simulation = get_package_share_directory('warehouse_simulation')
     pkg_share = get_package_share_directory(pkg_name)
     
     world_path = os.path.join(pkg_share, 'worlds', 'warehouse.world.sdf')
@@ -39,15 +40,26 @@ def generate_launch_description():
     #     }]
     # )
 
+    models_path = PathJoinSubstitution([
+        pkg_simulation,
+        'urdf'
+    ])
+
+    set_gazebo_model_path = AppendEnvironmentVariable(
+        'GZ_SIM_RESOURCE_PATH',
+        models_path
+    )
+
     # Differential Drive Controller
     diff_drive_controller = Node(
         package='robot_hardware',
         executable='diff_drive_controller',
         name='diff_drive_controller',
         output='screen',
-        parameters=[
-            {'use_sim_time': use_sim_time}
-        ]
+        parameters=[{
+            'robot_description': robot_desc,
+            'use_sim_time': use_sim_time
+        }]
     )
 
     # Differential Drive Controller
@@ -67,7 +79,7 @@ def generate_launch_description():
             )
         ),
 
-    # 3. Spawner
+    # # 3. Spawner
     spawn_robot = Node(
         package='ros_gz_sim',
         executable='create',
@@ -99,7 +111,7 @@ def generate_launch_description():
             default_value='true',
             description='Use simulation time'
         ),
-
+        set_gazebo_model_path,
         gazebo,
         spawn_robot,
         bridge,

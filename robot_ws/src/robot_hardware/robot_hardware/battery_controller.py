@@ -29,6 +29,8 @@ class BatterySimulator(Node):
         self.is_charging = False
         self.last_update_time = self.get_clock().now()
 
+        self.cb_group = ReentrantCallbackGroup()
+
         # Publishes Battery State
         self.battery_state_pub = self.create_publisher(
             BatteryState,
