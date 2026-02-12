@@ -11,6 +11,8 @@ from .ros_interface import WarehouseROSInterface
 
 import time
 
+from stable_baselines3.common.callbacks import BaseCallback
+
 
 def _resolve_default_model_dir() -> Path:
     """Prefer package share/models, fallback to CWD."""
@@ -30,6 +32,31 @@ def _resolve_default_model_dir() -> Path:
         cwd_dir.mkdir(parents=True, exist_ok=True)
         return cwd_dir
 
+from stable_baselines3.common.callbacks import BaseCallback
+
+class StopOnMaxEpisodes(BaseCallback):
+    def __init__(self, max_episodes: int):
+        super().__init__()
+        self.max_episodes = int(max_episodes)
+        self.episodes = 0
+
+    def _on_step(self) -> bool:
+        # In SB3 liegt "dones" bei VecEnv in self.locals
+        dones = self.locals.get("dones")
+        if dones is not None:
+            # bei n_envs>1 könnten mehrere true sein
+            self.episodes += int(dones.sum()) if hasattr(dones, "sum") else int(any(dones))
+        else:
+            done = self.locals.get("done")
+            if done:
+                self.episodes += 1
+
+        if self.episodes >= self.max_episodes:
+            print(f"[StopOnMaxEpisodes] Reached {self.episodes}/{self.max_episodes} episodes -> stopping.")
+            return False
+        return True
+
+
 
 def main():
     rclpy.init()
@@ -37,19 +64,17 @@ def main():
     ros = WarehouseROSInterface()
     ros.declare_parameter("total_timesteps", 50_000)
     ros.declare_parameter("save_name", "model.zip")
+    ros.declare_parameter("max_episodes", 0)
 
     total_timesteps = int(ros.get_parameter("total_timesteps").value)
     save_name = str(ros.get_parameter("save_name").value)
+    max_episodes = int(ros.get_parameter("max_episodes").value)
+
+    callback = StopOnMaxEpisodes(max_episodes) if max_episodes > 0 else None
 
     env = WarehouseMDPEnv(ros)
 
-    try:
-        from sb3_contrib import MaskablePPO
-    except Exception:
-        ros.get_logger().error(
-            "Missing RL dependencies. Install with: pip install stable-baselines3 sb3-contrib torch gymnasium"
-        )
-        raise
+    from sb3_contrib import MaskablePPO
 
     model_dir = _resolve_default_model_dir()
     model_path = model_dir / save_name
@@ -69,27 +94,25 @@ def main():
     executor = MultiThreadedExecutor(num_threads=4)
     executor.add_node(ros)
 
-    # Train in the same process: spin in background so the env can receive callbacks
-    spin_thread = None
     try:
-        import threading
+        import threading, time
 
         spin_thread = threading.Thread(target=executor.spin, daemon=True)
         spin_thread.start()
 
-        # --- IMPORTANT: one clean reset at startup ---
-        # Ensures job_handler emits EPISODE_RESET and all nodes (robot/stations/spawner) synchronize.
         ros.get_logger().info("Triggering initial /reset_episode before training ...")
-        try:
-            ros.reset_episode(num_packages=20, timeout_s=5.0)
-        except Exception as e:
-            ros.get_logger().error(f"Initial reset failed: {e}")
-            raise
-        # Give the system a short moment to process EPISODE_RESET and publish fresh robot_state
+        ros.reset_episode(num_packages=20, timeout_s=5.0)
         time.sleep(0.2)
 
-        ros.get_logger().info(f"Training for total_timesteps={total_timesteps} ...")
-        model.learn(total_timesteps=total_timesteps, progress_bar=False)
+        ros.get_logger().info(
+            f"Training: total_timesteps={total_timesteps}, max_episodes={max_episodes if max_episodes>0 else 'disabled'}"
+        )
+
+        model.learn(
+            total_timesteps=total_timesteps,
+            callback=callback,
+            progress_bar=True,
+        )
 
         ros.get_logger().info(f"Saving model to: {model_path}")
         model.save(str(model_path))
@@ -104,6 +127,7 @@ def main():
         except Exception:
             pass
         rclpy.shutdown()
+
 
 
 if __name__ == "__main__":
