@@ -7,6 +7,7 @@ from interfaces.action import Pick, Charge
 from interfaces.msg import WorldEvent, RobotState
 import time
 from rclpy.callback_groups import ReentrantCallbackGroup, MutuallyExclusiveCallbackGroup
+from std_srvs.srv import SetBool
 
 
 STATIONS = ["A","B","C","D","E","F","G"]
@@ -74,6 +75,23 @@ class StationNode(Node):
         if self.station_id == "F":
             self.charge_server = ActionServer(
                 self, Charge, "/robot_action/Station_F/charge", self.execute_charge, callback_group=self.cb_group_srv
+            )
+
+            # Client to control robot's battery charging state
+            self.set_charging_client = self.create_client(
+                SetBool,
+                '/robot/set_charging',
+                callback_group=self.cb_group_srv
+            )
+
+            # Subscribe to battery status for real battery level
+            self.current_battery = 0.0
+            self.battery_sub = self.create_subscription(
+                BatteryState,
+                '/robot/battery_status',
+                self.battery_status_callback,
+                10,
+                callback_group=self.cb_group_srv
             )
 
 
