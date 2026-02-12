@@ -13,7 +13,7 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='crexy',
+    maintainer='crexodon',
     maintainer_email='github@crexy.moe',
     description='TODO: Package description',
     license='MIT',
@@ -24,7 +24,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            #'battery_controller = robot_hardware.battery_controller:main',
+            'battery_controller = robot_hardware.battery_controller:main',
             'diff_drive_controller = robot_hardware.diff_drive_controller:main',
             #'gripper_controller = robot_hardware.gripper_controler:main'
         ],
