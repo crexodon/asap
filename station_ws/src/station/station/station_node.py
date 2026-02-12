@@ -192,6 +192,23 @@ class StationNode(Node):
             return False
 
         return True
+    
+    def battery_status_callback(self, msg):
+        self.current_battery = msg.percentage
+
+
+    # Helper to call the charging service:
+    async def set_robot_charging(self, enable: bool) -> bool:
+        """Enable or disable charging on the robot's battery."""
+        if not self.set_charging_client.wait_for_service(timeout_sec=2.0):
+            self.get_logger().error("set_charging service not available")
+            return False
+
+        request = SetBool.Request()
+        request.data = enable
+        future = self.set_charging_client.call_async(request)
+        result = await future
+        return result.success
 
 
     # ---------------- Services ----------------
@@ -374,47 +391,102 @@ class StationNode(Node):
             result = Charge.Result()
             result.result = "ABORTED_WRONG_STATION"
             result.battery = 0.0
+            result.dt = 0.0
             return result
         if not self.robot_present():
             goal_handle.abort()
             result = Charge.Result()
             result.result = "ABORTED_NOT_PRESENT"
             result.battery = 0.0
+            result.dt = 0.0
             return result
 
-        # Battery model placeholder: pretend battery increases over time; RobotInterface owns real battery later.
-        current_battery_status = float(goal_handle.request.current_battery_status)
-        rate = 10 # 10 per second
-        max_battery_status = 100
-        dt = 1 # feedback in 1 s steps
-        charge_time = 0
-        while current_battery_status < max_battery_status:
-            t0 = time.time()
-            while (time.time()- t0) < dt:
+        # Charging goal
+        target = 1.0
+        start_time = self.get_clock().now()
+
+        # Enable charging on the robot
+        if not await self.set_robot_charging(True):
+            goal_handle.abort()
+            result = Charge.Result()
+            result.result = "ABORTED_CHARGING_SERVICE_FAILED" # New Result
+            result.battery = self.current_battery
+            result.dt = 0.0
+            return result
+
+        rate = self.create_rate(10)
+
+        try:
+            while self.current_battery < target:
                 if not self.robot_present():
+                    await self.set_robot_charging(False)
                     goal_handle.abort()
                     result = Charge.Result()
                     result.result = "ABORTED_LEFT_STATION"
-                    result.battery = float(current_battery_status)
-                    self.emit_event("CHARGE_ABORTED")
+                    result.battery = self.current_battery
+                    result.dt = (self.get_clock().now() - start_time).nanoseconds / 1e9
+                    self.emit_event("ACTION_RESULT")
                     return result
-            charge_time += dt
-            current_battery_status += rate/dt
-            fb = Charge.Feedback()
-            fb.battery = float(current_battery_status)
-            goal_handle.publish_feedback(fb)
-            # rate.sleep()
 
-        if current_battery_status > max_battery_status:
-            current_battery_status = max_battery_status
+                fb = Charge.Feedback()
+                fb.battery = self.current_battery
+                goal_handle.publish_feedback(fb)
+                rate.sleep()
 
-        goal_handle.succeed()
-        result = Charge.Result()
-        result.result = "SUCCEEDED"
-        result.battery = float(current_battery_status)
-        result.dt = float(charge_time)
-        self.emit_event("CHARGE_FINISHED")
-        return result
+            # Disable charging
+            await self.set_robot_charging(False)
+
+            goal_handle.succeed()
+            result = Charge.Result()
+            result.result = "SUCCEEDED"
+            result.battery = self.current_battery
+            result.dt = (self.get_clock().now() - start_time).nanoseconds / 1e9
+            self.emit_event("ACTION_RESULT")
+            return result
+
+        except Exception as e:
+            await self.set_robot_charging(False)
+            goal_handle.abort()
+            result = Charge.Result()
+            result.result = "ABORTED_ERROR"
+            result.battery = self.current_battery
+            result.dt = (self.get_clock().now() - start_time).nanoseconds / 1e9
+            self.emit_event("ACTION_RESULT")
+            return result
+
+        # Battery model placeholder: pretend battery increases over time; RobotInterface owns real battery later.
+        # current_battery_status = float(goal_handle.request.current_battery_status)
+        # rate = 10 # 10 per second
+        # max_battery_status = 100
+        # dt = 1 # feedback in 1 s steps
+        # charge_time = 0
+        # while current_battery_status < max_battery_status:
+        #     t0 = time.time()
+        #     while (time.time()- t0) < dt:
+        #         if not self.robot_present():
+        #             goal_handle.abort()
+        #             result = Charge.Result()
+        #             result.result = "ABORTED_LEFT_STATION"
+        #             result.battery = float(current_battery_status)
+        #             self.emit_event("CHARGE_ABORTED")
+        #             return result
+        #     charge_time += dt
+        #     current_battery_status += rate/dt
+        #     fb = Charge.Feedback()
+        #     fb.battery = float(current_battery_status)
+        #     goal_handle.publish_feedback(fb)
+        #     # rate.sleep()
+
+        # if current_battery_status > max_battery_status:
+        #     current_battery_status = max_battery_status
+
+        # goal_handle.succeed()
+        # result = Charge.Result()
+        # result.result = "SUCCEEDED"
+        # result.battery = float(current_battery_status)
+        # result.dt = float(charge_time)
+        # self.emit_event("CHARGE_FINISHED")
+        # return result
 
     # ---------------- Processing loop (B,C,D,E,G) ----------------
     def processing_step(self):
