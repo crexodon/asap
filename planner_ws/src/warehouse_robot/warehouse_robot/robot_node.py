@@ -514,7 +514,7 @@ class WarehouseRobotNode(Node):
             res = PlannerCmd.Result()
             res.result = "OK" if ok else "FAIL"
             res.dt = float(dt)
-            self.get_logger().info(f"PICK_A raw result_str={result_str} dt={dt}")
+            self.get_logger().info(f"CHARGE raw result_str={result_str} dt={dt}")
             return res
 
         # Unknown command

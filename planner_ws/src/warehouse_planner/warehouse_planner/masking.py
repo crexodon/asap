@@ -64,8 +64,8 @@ def compute_action_mask(obs: dict) -> np.ndarray:
         return mask
     
     # WAIT only not carrying a package
-    if carrying != -1:
-        mask[type_param_to_flat(0, 0)] = False
+    if carrying == -1:
+        mask[type_param_to_flat(0, 0)] = True
     
     # Current station param for MOVE_TO (0..6 for A..G).
     # robot_location is encoded as: 0=ON_TRANSIT, 1..7=A..G
@@ -77,7 +77,7 @@ def compute_action_mask(obs: dict) -> np.ndarray:
     # CHARGE only when at F and battery < 95 (avoid double-charging at full)
     if robot_loc_idx == station_f_idx and battery < 95.0:
          for p in range(20):
-             mask[type_param_to_flat(1, p)] = True
+             mask[type_param_to_flat(1, 0)] = True
 
     # MOVE_TO (only when not ON_TRANSIT - already returned above)
     station_param_f = STATIONS.index("F")  # 5
