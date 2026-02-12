@@ -12,6 +12,9 @@ from .encoding import EncodedState
 from .masking import compute_action_mask, flat_to_type_param, station_param_to_station
 from .ros_interface import WarehouseROSInterface
 
+SUCCESS_BONUS = 1000.0
+FAIL_PENALTY = 600
+
 
 class WarehouseMDPEnv(gym.Env):
     """Gymnasium env backed by a running ROS2 simulation.
@@ -195,6 +198,7 @@ class WarehouseMDPEnv(gym.Env):
 
         # Reward is negative actual elapsed time
         reward = -float(dt)
+        battery_depleted = False
 
         # Episode termination logic
         terminated = self.ros.is_done()
@@ -205,7 +209,19 @@ class WarehouseMDPEnv(gym.Env):
             with self.ros._robot_state_lock:
                 rs = self.ros._robot_state
             if rs is not None and float(rs.battery) <= 0.0:
-                truncated = True
+                battery_depleted = True
+                
+        # Battery depleted ends the episode as terminal failure
+        if battery_depleted:
+            terminated = True
+            truncated = False
+            reward -= FAIL_PENALTY
+
+        # Success bonus (only if we are terminating successfully)
+        # Note: if both battery_depleted and is_done could be True (shouldn't happen),
+        # failure penalty already applied; you can prioritize one explicitly if needed.
+        if terminated and (not battery_depleted) and self.ros.is_done():
+            reward += SUCCESS_BONUS
 
         if self.ros.episode_elapsed_s() >= self.ros.max_episode_time_s:
             truncated = True
