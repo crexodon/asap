@@ -59,14 +59,25 @@ def main():
         )
         raise
 
-    if not model_path.exists():
-        ros.get_logger().error(f"Model file not found: {model_path}")
-        raise FileNotFoundError(str(model_path))
-
     env = WarehouseMDPEnv(ros)
 
+    # If user provided a relative path, resolve it against CWD
+    if not model_path.is_absolute():
+       model_path = (Path(os.getcwd()) / model_path).resolve()
+
+    if not model_path.exists():
+        ros.get_logger().error(f"Model file not found: {model_path}")
+        ros.get_logger().error(
+            "Tip: train node can save to the same path via '--ros-args -p model_path:=...'"
+        )
+        ros.get_logger().error(
+            f"Default locations checked: {Path(os.getcwd()) / 'warehouse_planner_models' / 'model.zip'} "
+            f"and <pkg_share>/models/model.zip"
+        )
+        raise FileNotFoundError(str(model_path))
+
     ros.get_logger().info(f"Loading model: {model_path}")
-    model = MaskablePPO.load(str(model_path))
+    model = MaskablePPO.load(str(model_path), env=env)
 
     executor = MultiThreadedExecutor(num_threads=4)
     executor.add_node(ros)

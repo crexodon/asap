@@ -12,6 +12,7 @@ from .ros_interface import WarehouseROSInterface
 import time
 
 from stable_baselines3.common.callbacks import BaseCallback
+from sb3_contrib import MaskablePPO
 
 
 def _resolve_default_model_dir() -> Path:
@@ -32,7 +33,14 @@ def _resolve_default_model_dir() -> Path:
         cwd_dir.mkdir(parents=True, exist_ok=True)
         return cwd_dir
 
-from stable_baselines3.common.callbacks import BaseCallback
+def _resolve_default_model_path(save_name: str = "model.zip") -> Path:
+    """
+    Default model path that is compatible with planner_inference_node:
+    - prefer <pkg_share>/models/<save_name> if writable
+    - else fallback to ./warehouse_planner_models/<save_name>
+    """
+    return _resolve_default_model_dir() / str(save_name)
+
 
 class StopOnMaxEpisodes(BaseCallback):
     def __init__(self, max_episodes: int):
@@ -72,12 +80,31 @@ def main():
 
     callback = StopOnMaxEpisodes(max_episodes) if max_episodes > 0 else None
 
+     # NEW: allow overriding the exact model file path (same name as inference node)
+    default_model_path = str(_resolve_default_model_path(save_name))
+    ros.declare_parameter("model_path", default_model_path)
+    model_path = Path(str(ros.get_parameter("model_path").value))
+
+    # ensure parent dir exists; if it fails (e.g. share is read-only), fallback to CWD
+    try:
+        model_path.parent.mkdir(parents=True, exist_ok=True)
+        # quick writability check
+        test_file = model_path.parent / ".write_test"
+        test_file.write_text("ok")
+        test_file.unlink()
+    except Exception as e:
+        fallback = Path(os.getcwd()) / "warehouse_planner_models" / save_name
+        fallback.parent.mkdir(parents=True, exist_ok=True)
+        ros.get_logger().warn(
+            f"model_path '{model_path}' not writable ({e}). Falling back to '{fallback}'."
+        )
+        model_path = fallback
+
     env = WarehouseMDPEnv(ros)
 
-    from sb3_contrib import MaskablePPO
 
-    model_dir = _resolve_default_model_dir()
-    model_path = model_dir / save_name
+
+    model_dir = model_path.parent
 
     if model_path.exists():
         ros.get_logger().info(f"Loading existing model: {model_path}")
@@ -105,7 +132,7 @@ def main():
         time.sleep(0.2)
 
         ros.get_logger().info(
-            f"Training: total_timesteps={total_timesteps}, max_episodes={max_episodes if max_episodes>0 else 'disabled'}"
+            f"Training: total_timesteps={total_timesteps}, max_episodes={max_episodes if max_episodes>0 else 'disabled'} (will save to {model_path}" 
         )
 
         model.learn(
