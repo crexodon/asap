@@ -21,6 +21,8 @@ class StationNode(Node):
         self.declare_parameter("seed", 0)
         self.declare_parameter("process_dt", 0.2)
 
+        self.sub_event = self.create_subscription(WorldEvent, "/world_event", self.on_world_event, 10)
+
         self.station_id = self.get_parameter("station_id").get_parameter_value().string_value
         self.rng = random.Random(self.get_parameter("seed").get_parameter_value().integer_value)
         self.process_dt = float(self.get_parameter("process_dt").get_parameter_value().double_value)
@@ -81,6 +83,25 @@ class StationNode(Node):
 
         self.emit_event("STATION_READY")
 
+
+    def on_world_event(self, msg: WorldEvent):
+        if msg.event_type != "EPISODE_RESET":
+            return
+        self.reset_local_state()
+
+    def reset_local_state(self):
+        # Clear all internal queues/state so episode reset is consistent
+        self.input_queue.clear()
+        self.output_queue.clear()
+        self.output_success_queue.clear()
+        self.output_failed_queue.clear()
+        self.processing_idx = -1
+        self.processing_state = "IDLE"
+        self._remaining = 0.0
+        # make robot_present() false until robot publishes a fresh state
+        self.robot_location = "ON_TRANSIT"
+        self.emit_event("STATION_RESET")   
+
     def on_robot_state(self, msg: RobotState):
         self.robot_location = msg.robot_location
     
@@ -100,7 +121,8 @@ class StationNode(Node):
                     ["current_location", "lifecycle_state", "availability", "next_location"],
                     ["A", "READY", "true", "B"])
 
-        self.emit_event("QUEUE_CHANGED", package_idx=pkg)
+        self.emit_event("PACKAGE_SPAWNED", package_idx=pkg)
+        self.emit_event("PROCESS_FINISHED", package_idx=pkg)
         return res
 
 
@@ -176,7 +198,7 @@ class StationNode(Node):
         else:
             self.set_pkg(pkg, ["current_location","lifecycle_state","availability"], [self.station_id, "WAITING", "false"])
 
-        self.emit_event("QUEUE_CHANGED", package_idx=pkg)
+        self.emit_event("ENQUEUED", package_idx=pkg)
         return res
 
     def on_dequeue(self, req: Dequeue.Request, res: Dequeue.Response):
@@ -209,7 +231,7 @@ class StationNode(Node):
 
         # picked up by robot
         self.set_pkg(pkg, ["current_location","availability"], ["ROBOT","false"])
-        self.emit_event("QUEUE_CHANGED", package_idx=pkg)
+        self.emit_event("DEQUEUED", package_idx=pkg)
         return res
     
     def get_pkg_lifecycle(self, package_idx: int) -> str | None:
@@ -219,16 +241,32 @@ class StationNode(Node):
 
         req = GetPackages.Request()
         req.all = True
+
         fut = self.cli_get_pkgs.call_async(req)
-        rclpy.spin_until_future_complete(self, fut, timeout_sec=2.0)
-        if not fut.done() or fut.result() is None:
-            self.get_logger().error("get_packages call failed")
+
+        t0 = time.time()
+        while not fut.done():
+            if time.time() - t0 > 2.0:
+                self.get_logger().error("get_packages call timed out (future not done)")
+                return None
+            time.sleep(0.01)
+
+        try:
+            res = fut.result()
+        except Exception as e:
+            self.get_logger().error(f"get_packages call raised exception: {e}")
             return None
 
-        for p in fut.result().packages:
+        if res is None:
+            self.get_logger().error("get_packages returned None")
+            return None
+
+        for p in res.packages:
             if int(p.package_idx) == int(package_idx):
                 return str(p.lifecycle_state)
+
         return None
+
 
 
     # ---------------- Actions ----------------
@@ -281,7 +319,7 @@ class StationNode(Node):
                     result = Pick.Result()
                     result.result = "ABORTED_LEFT_STATION"
                     result.package_idx = pkg
-                    self.emit_event("ACTION_RESULT", package_idx=pkg)
+                    self.emit_event("PICK_A_FAILED", package_idx=pkg)
                     return result
 
                 elapsed = time.time() - t0
@@ -308,7 +346,7 @@ class StationNode(Node):
         result = Pick.Result()
         result.result = f"SUCCEEDED with {attempt} tries"
         result.package_idx = pkg
-        self.emit_event("ACTION_RESULT", package_idx=pkg)
+        self.emit_event("PICK_A_SUCCESS", package_idx=pkg)
         return result
 
 
@@ -327,28 +365,37 @@ class StationNode(Node):
             return result
 
         # Battery model placeholder: pretend battery increases over time; RobotInterface owns real battery later.
-        target = float(goal_handle.request.target_battery)
-        b = 0.5
-        rate = self.create_rate(10)
-        while b < target:
-            if not self.robot_present():
-                goal_handle.abort()
-                result = Charge.Result()
-                result.result = "ABORTED_LEFT_STATION"
-                result.battery = float(b)
-                self.emit_event("ACTION_RESULT")
-                return result
-            b = min(target, b + 0.02)
+        current_battery_status = float(goal_handle.request.current_battery_status)
+        rate = 10 # 10 per second
+        max_battery_status = 100
+        dt = 1 # feedback in 1 s steps
+        charge_time = 0
+        while current_battery_status < max_battery_status:
+            t0 = time.time()
+            while (time.time()- t0) < dt:
+                if not self.robot_present():
+                    goal_handle.abort()
+                    result = Charge.Result()
+                    result.result = "ABORTED_LEFT_STATION"
+                    result.battery = float(current_battery_status)
+                    self.emit_event("CHARGE_ABORTED")
+                    return result
+            charge_time += dt
+            current_battery_status += rate/dt
             fb = Charge.Feedback()
-            fb.battery = float(b)
+            fb.battery = float(current_battery_status)
             goal_handle.publish_feedback(fb)
-            rate.sleep()
+            # rate.sleep()
+
+        if current_battery_status > max_battery_status:
+            current_battery_status = max_battery_status
 
         goal_handle.succeed()
         result = Charge.Result()
         result.result = "SUCCEEDED"
-        result.battery = float(b)
-        self.emit_event("ACTION_RESULT")
+        result.battery = float(current_battery_status)
+        result.dt = float(charge_time)
+        self.emit_event("CHARGE_FINISHED")
         return result
 
     # ---------------- Processing loop (B,C,D,E,G) ----------------
@@ -369,8 +416,7 @@ class StationNode(Node):
                     # terminal: keep FAILED and send to FINISH
                     self.set_pkg(pkg, ["next_location", "availability"], ["FINISH", "false"])
 
-                    self.emit_event("PROCESS_FINISHED", package_idx=pkg)
-                    self.emit_event("QUEUE_CHANGED", package_idx=pkg)
+                    self.emit_event("PUT_FAILED_TO_STORE", package_idx=pkg)
                     return
 
             self.processing_state = "RUNNING"
@@ -453,7 +499,6 @@ class StationNode(Node):
                 self.set_pkg(pkg, ["next_location","lifecycle_state","availability"], ["FINISH","FAILED","false"])
 
         self.emit_event("PROCESS_FINISHED", package_idx=pkg)
-        self.emit_event("QUEUE_CHANGED", package_idx=pkg)
 
 def main():
     rclpy.init()

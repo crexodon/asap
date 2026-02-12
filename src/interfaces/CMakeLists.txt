@@ -19,6 +19,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/GetPackages.srv"
   "action/Pick.action"
   "action/Charge.action"
+  "action/PlannerCmd.action"
   DEPENDENCIES action_msgs std_msgs
 )
 

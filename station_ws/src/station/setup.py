@@ -13,7 +13,6 @@ setup(
         ('share/' + package_name, ['package.xml']),
         (os.path.join('share', package_name, 'config'), glob('config/*.yaml')),
 
-        # IMPORTANT: only works if your launch file is inside launch/
         (os.path.join('share', package_name, 'launch'), glob('launch/*.launch.py')),
     ],
     install_requires=['setuptools', 'pyyaml'],
