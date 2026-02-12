@@ -57,14 +57,22 @@ def compute_action_mask(obs: dict) -> np.ndarray:
         mask[forced[episode_step]] = True
         return mask
 
-     # WAIT always true (param ignored)
-    for p in range(20):
-        mask[type_param_to_flat(0, p)] = True
 
     # If robot is in transit, no commands should be set (safety):
     # only WAIT remains available.
     if robot_loc_idx == on_transit_idx:
         return mask
+    
+    # WAIT only not carrying a package
+    if carrying != -1:
+        mask[type_param_to_flat(0, 0)] = False
+    
+    # Current station param for MOVE_TO (0..6 for A..G).
+    # robot_location is encoded as: 0=ON_TRANSIT, 1..7=A..G
+    # MOVE_TO params are encoded as: 0..6=A..G
+    current_station_param: int | None = None
+    if 1 <= robot_loc_idx <= len(STATIONS):
+        current_station_param = robot_loc_idx - 1
 
     # CHARGE only when at F and battery < 95 (avoid double-charging at full)
     if robot_loc_idx == station_f_idx and battery < 95.0:
@@ -95,6 +103,7 @@ def compute_action_mask(obs: dict) -> np.ndarray:
         # MOVE_TO F only if battery < 50
         if allow_f:
             mask[type_param_to_flat(2, station_param_f)] = True
+        
 
     else:
         # carrying: allow to go to next_station of that package (if A..G), plus F (if battery < 50)
@@ -104,6 +113,12 @@ def compute_action_mask(obs: dict) -> np.ndarray:
         if allow_f:
             mask[type_param_to_flat(2, station_param_f)] = True
 
+    
+    # Forbid MOVE_TO to the station where the robot already is (no-op move).
+    # Apply after MOVE_TO candidates have been enabled, so it works for both
+    # "carrying" and "not carrying" branches.
+    if current_station_param is not None and 0 <= current_station_param <= 6:
+        mask[type_param_to_flat(2, current_station_param)] = False
     # PICK (explicitly only at B, C, D, G)
     # - robot_loc in {B,C,D,G}
     # - carrying == -1
