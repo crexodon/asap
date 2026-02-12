@@ -95,7 +95,7 @@ def generate_launch_description():
         ),
 
         set_gazebo_model_path,
-        gz_sim,
+        #gz_sim,
         gz_ros_bridge,
         diff_drive_controller,
     ])

@@ -1,9 +1,10 @@
 import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription
+from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument, AppendEnvironmentVariable
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 
 def generate_launch_description():
     pkg_name = 'warehouse_simulation'
@@ -12,6 +13,8 @@ def generate_launch_description():
     world_path = os.path.join(pkg_share, 'worlds', 'warehouse.world.sdf')
     urdf_path = os.path.join(pkg_share, 'urdf', 'robot.urdf')
 
+    station_pkg = get_package_share_directory('station')
+
     # 1. Gazebo starten (Harmonic ist Standard in Jazzy)
     gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([os.path.join(
@@ -19,19 +22,50 @@ def generate_launch_description():
         launch_arguments={'gz_args': f'-r {world_path}'}.items(),
     )
 
+    use_sim_time = LaunchConfiguration('use_sim_time', default='true')
+
+
     # 2. Robot State Publisher
     with open(urdf_path, 'r') as infp:
         robot_desc = infp.read()
     
-    node_robot_state_publisher = Node(
-        package='robot_state_publisher',
-        executable='robot_state_publisher',
+    # node_robot_state_publisher = Node(
+    #     package='robot_state_publisher',
+    #     executable='robot_state_publisher',
+    #     output='screen',
+    #     parameters=[{
+    #         'robot_description': robot_desc,
+    #         'use_sim_time': True
+    #     }]
+    # )
+
+    # Differential Drive Controller
+    diff_drive_controller = Node(
+        package='robot_hardware',
+        executable='diff_drive_controller',
+        name='diff_drive_controller',
         output='screen',
-        parameters=[{
-            'robot_description': robot_desc,
-            'use_sim_time': True
-        }]
+        parameters=[
+            {'use_sim_time': use_sim_time}
+        ]
     )
+
+    # Differential Drive Controller
+    battery_controller = Node(
+        package='robot_hardware',
+        executable='battery_controller',
+        name='battery_controller',
+        output='screen',
+        parameters=[
+            {'use_sim_time': use_sim_time}
+        ]
+    )
+
+    IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(station_pkg, 'launch', 'station.launch.py')
+            )
+        ),
 
     # 3. Spawner
     spawn_robot = Node(
@@ -60,8 +94,15 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
+        DeclareLaunchArgument(
+            'use_sim_time',
+            default_value='true',
+            description='Use simulation time'
+        ),
+
         gazebo,
-        node_robot_state_publisher,
         spawn_robot,
-        bridge
+        bridge,
+        diff_drive_controller,
+        battery_controller
     ])

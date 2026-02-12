@@ -26,8 +26,8 @@ class DiffDriveController(Node):
         self.declare_parameters(
             namespace='',
             parameters=[
-                ('max_linear_velocity', 0.5),       # m/s
-                ('max_angular_velocity', 1),      # rad/s
+                ('max_linear_velocity', 2.0),       # m/s
+                ('max_angular_velocity', 1.5),      # rad/s
                 ('cmd_vel_timeout', 0.5),           # seconds
                 ('publish_rate', 50.0),             # Hz
             ]

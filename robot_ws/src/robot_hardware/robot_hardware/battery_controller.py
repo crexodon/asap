@@ -18,7 +18,7 @@ class BatterySimulator(Node):
                 ('discharging_rate', 1.0),   # Wh/tick
                 ('battery_ticks', 1.0),      # seconds
                 ('publish_rate', 50.0),      # Hz
-            ]
+            ])
         self.max_capacity = self.get_parameter('max_capacity').value
         self.charging_rate = self.get_parameter('charging_rate').value
         self.discharging_rate = self.get_parameter('discharging_rate').value
