@@ -448,11 +448,11 @@ class StationNode(Node):
         if self.station_id == "B":
             success = (self.rng.random() < 0.80) # Success Prob 0.8
         elif self.station_id == "C":
-            success = (self.rng.random() < 0.80) # Success Prob 0.95
+            success = (self.rng.random() < 0.95) # Success Prob 0.95
         elif self.station_id == "D":
-            success = (self.rng.random() < 0.80) # Success Prob 0.85
+            success = (self.rng.random() < 0.85) # Success Prob 0.85
         elif self.station_id == "E":
-            success = (self.rng.random() < 0.80) # Success Prob 0.85
+            success = (self.rng.random() < 0.85) # Success Prob 0.85
         elif self.station_id == "G":
             success = True # Success Prob 1.0
 
