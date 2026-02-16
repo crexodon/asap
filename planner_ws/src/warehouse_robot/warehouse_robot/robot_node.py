@@ -164,9 +164,8 @@ class WarehouseRobotNode(Node):
         dx = dst[0] - src[0]
         dy = dst[1] - src[1]
         dist = math.sqrt(dx * dx + dy * dy)
-        base = (dist / max(self.move_speed, 1e-6)) * self.move_factor
-        rnd = self.rng.uniform(self.move_rand_min, self.move_rand_max)
-        return float(base + rnd)
+        base = (dist / max(self.move_speed, 1e-6))
+        return float(base)
 
     def _wait_for_service(self, client, name: str, timeout_s: float = 5.0) -> bool:
         t0 = time.time()

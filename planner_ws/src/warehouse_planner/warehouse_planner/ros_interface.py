@@ -59,7 +59,7 @@ class WarehouseROSInterface(Node):
         self.cb_group = ReentrantCallbackGroup()
 
         # Parameters
-        self.declare_parameter("max_episode_time_s", 600.0)
+        self.declare_parameter("max_episode_time_s", 1000.0)
         self.declare_parameter("wait_cancel_immediately", True)
 
         self.max_episode_time_s = float(self.get_parameter("max_episode_time_s").value)

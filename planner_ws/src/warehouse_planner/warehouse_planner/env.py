@@ -14,6 +14,9 @@ from .ros_interface import WarehouseROSInterface
 
 SUCCESS_BONUS = 1000.0
 FAIL_PENALTY = 600
+DROP_BONUS = 10
+PICK_BONUS = 10
+WAIT_PENALTY = -1
 
 
 class WarehouseMDPEnv(gym.Env):
@@ -55,9 +58,6 @@ class WarehouseMDPEnv(gym.Env):
         )
 
         self._episode_step: int = 0
-        # Forced prefix actions per episode:
-        # 0) MOVE_TO A, 1) PICK_A 0, 2) MOVE_TO B, 3) DROP 0
-        self._forced_prefix_actions = [40, 100, 41, 80]
 
         self._last_step_time = time.monotonic()
         self._last_delta_time = 0.0
@@ -158,14 +158,15 @@ class WarehouseMDPEnv(gym.Env):
 
 
     def step(self, action: int):
-        if self._episode_step < len(self._forced_prefix_actions):
-            action = int(self._forced_prefix_actions[self._episode_step])
         atype, param = flat_to_type_param(int(action))
 
         dt = 0.0
         terminated = False
         truncated = False
 
+        reward_pick = 0.0
+        reward_drop = 0.0
+        reward_wait = 0.0
 
 
         # Execute action
@@ -176,6 +177,7 @@ class WarehouseMDPEnv(gym.Env):
             dt = float(waited) if waited is not None else 1.0
             if dt is None:
                 dt = 1.0
+            reward_wait = WAIT_PENALTY
 
         elif atype == 1:  # CHARGE
             res = self.ros.send_cmd("CHARGE")
@@ -187,9 +189,11 @@ class WarehouseMDPEnv(gym.Env):
         elif atype == 3:  # PICK
             res = self.ros.send_cmd(f"PICK {param}")
             dt = res.dt
+            reward_pick = PICK_BONUS
         elif atype == 4:  # DROP
             res = self.ros.send_cmd(f"DROP {param}")
             dt = res.dt
+            reward_drop= DROP_BONUS
         elif atype == 5:  # PICK_A
             res = self.ros.send_cmd(f"PICK_A {param}")
             dt = res.dt
@@ -197,7 +201,7 @@ class WarehouseMDPEnv(gym.Env):
             dt = 0.0
 
         # Reward is negative actual elapsed time
-        reward = -float(dt)
+        reward = -float(dt) + reward_pick + reward_drop + reward_wait
         battery_depleted = False
 
         # Episode termination logic

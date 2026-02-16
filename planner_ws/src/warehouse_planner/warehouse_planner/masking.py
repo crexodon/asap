@@ -47,20 +47,11 @@ def compute_action_mask(obs: dict) -> np.ndarray:
     station_f_idx = ROBOT_LOCATION_TO_IDX["F"]
     station_e_idx = ROBOT_LOCATION_TO_IDX["E"]
 
-    # --- Forced prefix actions per episode (exactly one action allowed) ---
-    # 0) MOVE_TO A (2*20+0=40)
-    # 1) PICK_A 0 (5*20+0=100)
-    # 2) MOVE_TO B (2*20+1=41)
-    # 3) DROP 0 (4*20+0=80)
-    forced = {0: 40, 1: 100, 2: 41, 3: 80}
-    if episode_step in forced:
-        mask[forced[episode_step]] = True
-        return mask
-
 
     # If robot is in transit, no commands should be set (safety):
-    # only WAIT remains available.
+    # only MOVE_A remains available.
     if robot_loc_idx == on_transit_idx:
+        mask[type_param_to_flat(2, STATIONS.index("A"))] = True
         return mask
     
     # WAIT only not carrying a package
@@ -75,7 +66,7 @@ def compute_action_mask(obs: dict) -> np.ndarray:
         current_station_param = robot_loc_idx - 1
 
     # CHARGE only when at F and battery < 95 (avoid double-charging at full)
-    if robot_loc_idx == station_f_idx and battery < 95.0:
+    if robot_loc_idx == station_f_idx and battery < 50.0:
          for p in range(20):
              mask[type_param_to_flat(1, 0)] = True
 
