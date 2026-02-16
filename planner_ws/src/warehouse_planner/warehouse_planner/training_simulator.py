@@ -4,6 +4,17 @@ from typing import Dict, Tuple
 import math
 from mappings import LOCATION_TO_INT, INT_TO_LOCATION
 
+from encoding_train import (
+    EncodedState,
+    LIFECYCLE_TO_IDX,
+    PACKAGE_LOCATION_TO_IDX,
+    NEXT_LOCATION_TO_IDX,
+    ROBOT_LOCATION_TO_IDX,
+    SHIPPING_TO_IDX,
+    safe_idx,
+    carrying_from_packages,
+)
+
 @dataclass
 class PackageState:
     package_idx: int = -1
@@ -180,6 +191,7 @@ class Simulator:
         if cmd == "WAIT":
             self.time += self.wait_time
             result = True
+            time_delta = self.wait_time
         elif cmd == "CHARGE":
             self.charge_flag = True
             # calculate time until battery ist full
@@ -188,21 +200,23 @@ class Simulator:
             self.time+=dt
             self.charge_flag = False
             result = True
+            time_delta = dt
 
         elif cmd == "MOVE_TO":
             # param: 0..6 -> A..G
             location_idx = LOCATION_TO_INT[self.robot_location]
             idx = int(param)
-            idx = max(0, min(idx, 6))
             self.robot_location = STATIONS[idx]
             self.time += self.move_to_times[location_idx][param]
             result = True
+            time_delta = self.move_to_times[location_idx][param]
 
         elif cmd == "PICK":
             # check if robot is idle and package is available
             if self.robot_carrying != -1 or self.packages[param].availability != True:
                 print("pick is not vaild")
                 result = False
+                time_delta = 0
             else:
                 # check if package is available at the current station
                 if (self.robot_location == self.packages[param].current_location):
@@ -213,9 +227,12 @@ class Simulator:
                     self.packages[param].availability = False
                     self.output_queues[station_idx].remove(param)
                     self.time += 0.1
+                    time_delta = 0.1
+                    
                 else:
                     print("pick is not vaild")
                     result = False
+                    time_delta = 0
             
         elif cmd == "DROP":
             # check robot is at a staion an is carrying the package to drop
@@ -245,6 +262,7 @@ class Simulator:
                     dt = 2.0 * self.rng.random() + 2.0 # U(2.0,4.0)
                 else:
                     print("drop is not vaild")
+                    dt = 0
 
                 # check if input_queue is empty
                 if not self.input_queues[station_idx]:
@@ -257,15 +275,18 @@ class Simulator:
                 self.process_time_start[station_idx].append(start_time)
                 self.process_time_end[station_idx].append(start_time + dt)
                 self.time += 0.1
+                time_delta = 0.1
 
             else:
                 print("drop is not vaild")
                 result = False
+                time_delta = 0
 
         elif cmd == "PICK_A":
-            if (self.robot_location != "A") and (self.packages[param].current_location != "A") and (self.packages[param].availability == False):
+            if (self.robot_location != "A") or (self.packages[param].current_location != "A") and (self.packages[param].availability == False):
                 result = False
                 print("pick at A not valid")
+                time_delta = 0
             else:
                 attempt = 0
                 dt = 0
@@ -285,8 +306,9 @@ class Simulator:
                 self.robot_carrying = param
                 self.time += dt
                 result = True
+                time_delta = dt
 
-        return result
+        return result, time_delta
 
     def get_dist_times(self, p1, p2):
         return math.sqrt((p2[0] - p1[0])**2 + (p2[1] - p1[1])**2) / self.robot_max_speed
@@ -338,6 +360,56 @@ class Simulator:
 
 
 
-        
+        self.max_episode_time_s = 600.0
         self.time = 0.0
 
+    def build_encoded_state(self, delta_time):
+        pkgs_res = self.packages
+        if pkgs_res is None:
+            return None
+        rs = self.robot_location
+        if rs is None:
+            return None
+
+        # Prepare arrays
+        n = 20
+        loc = np.zeros((n,), dtype=np.int64)
+        nxt = np.zeros((n,), dtype=np.int64)
+        ship = np.zeros((n,), dtype=np.int64)
+        life = np.zeros((n,), dtype=np.int64)
+        avail = np.zeros((n,), dtype=np.int64)
+
+        for i in range(self.num_packages):
+            loc[i] = safe_idx(PACKAGE_LOCATION_TO_IDX, str(pkgs_res[i].current_location), 0)
+            # next_location is station id or "FINISH"
+            nxt[i] = safe_idx(NEXT_LOCATION_TO_IDX, str(pkgs_res[i].next_location), 0)
+            ship[i] = safe_idx(SHIPPING_TO_IDX, str(pkgs_res[i].shipping_type), 0)
+            life[i] = safe_idx(LIFECYCLE_TO_IDX, str(pkgs_res[i].lifecycle_state), 0)
+            avail[i] = 1 if bool(pkgs_res[i].availability) else 0
+
+
+        return EncodedState(
+            battery_status=float(self.robot_battery),
+            robot_location=safe_idx(ROBOT_LOCATION_TO_IDX, str(self.robot_location), 0),
+            robot_carrying_idx=self.robot_carrying,
+            delta_time=float(delta_time),
+            package_location=loc,
+            package_next_station=nxt,
+            package_shipping_type=ship,
+            package_lifecycle_state=life,
+            package_availability=avail,
+        )
+    
+    def is_done(self):
+        pkgs_res = self.packages
+        if pkgs_res is None:
+            return False
+        done_count = 0
+        for i in range(self.num_packages):
+            if str(pkgs_res[i].next_location) == "FINISH":
+                done_count += 1
+        return done_count >= 20
+    
+
+    def episode_elapsed_s(self):
+        return self.time
