@@ -41,7 +41,7 @@ class StopOnMaxEpisodes(BaseCallback):
 
 def main():
 
-    total_timesteps = 6_000_000
+    total_timesteps = 500_000
     max_episodes = 10_000
     max_episode_time_s = 1000
     wait_cancel_immediately = True
@@ -51,7 +51,7 @@ def main():
     callback = StopOnMaxEpisodes(max_episodes) if max_episodes > 0 else None
 
     # define path for model
-    model_path = Path("/home/norika-schneider/asap/planner_ws/src/warehouse_planner/models/model3.zip")
+    model_path = Path("/home/norika-schneider/asap/planner_ws/src/warehouse_planner/models/model5.zip")
     tensor_path = Path("/home/norika-schneider/asap/planner_ws/src/warehouse_planner/tensor_log")
 
     env = WarehouseMDPEnv(headless)

@@ -17,7 +17,7 @@ pip install stable-baselines3 sb3-contrib torch gymnasium numpy
 ## Train an agent
 
 ```bash
-cd planner_ws/src/warehouse_planner/warehouse_planner
+cd asap/planner_ws/src/warehouse_planner/warehouse_planner
 ```
 Define model_path in the the code.
 

@@ -5,8 +5,6 @@ import numpy as np
 from .constants import ACTION_TYPES, FLAT_ACTIONS_N, STATIONS
 from .encoding import PACKAGE_LOCATION_TO_IDX, ROBOT_LOCATION_TO_IDX
 
-DEBUG_MASK = False
-
 
 def flat_to_type_param(action: int) -> tuple[int, int]:
     atype = int(action) // 20
@@ -33,7 +31,6 @@ def compute_action_mask(obs: dict) -> np.ndarray:
     robot_loc_idx = int(obs["robot_location"][0])
     battery = float(obs["battery_status"][0])
     carrying = int(obs["robot_carrying_idx"][0])
-    episode_step = int(obs.get("episode_step", np.array([10], dtype=np.int64))[0])
 
     pkg_loc = obs["package_location"]  # (20,)
     pkg_next = obs["package_next_station"]
@@ -71,8 +68,11 @@ def compute_action_mask(obs: dict) -> np.ndarray:
     allow_f = (battery < 50.0)
 
     if carrying == -1:
-        # MOVE_TO A only if empty 
-        mask[type_param_to_flat(2, STATIONS.index("A"))] = True
+        # MOVE_TO A only if empty and if at least one package currently located there
+        #mask[type_param_to_flat(2, STATIONS.index("A"))] = True
+        st_idx = PACKAGE_LOCATION_TO_IDX["A"]
+        if np.any(pkg_loc == st_idx):
+            mask[type_param_to_flat(2, STATIONS.index("A"))] = True
 
         # MOVE_TO B/C/G only if there exists at least one package currently located there
         for st in ["B", "C", "G"]:

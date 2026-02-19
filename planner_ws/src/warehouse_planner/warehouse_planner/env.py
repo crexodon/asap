@@ -15,7 +15,7 @@ SUCCESS_BONUS = 1000.0
 FAIL_PENALTY = 600
 DROP_BONUS = 10
 PICK_BONUS = 10
-WAIT_PENALTY = -1
+WAIT_PENALTY = 0
 
 
 class WarehouseMDPEnv(gym.Env):
@@ -163,7 +163,7 @@ class WarehouseMDPEnv(gym.Env):
             reward_wait = WAIT_PENALTY
 
         elif atype == 1:  # CHARGE
-            penalty_charge = float(self._last_obs["battery_status"][0]) / 10
+            penalty_charge = float(self._last_obs["battery_status"][0]) / 5
             res = self.ros.send_cmd("CHARGE")
             dt = res.dt
         elif atype == 2:  # MOVE_TO
@@ -181,11 +181,12 @@ class WarehouseMDPEnv(gym.Env):
         elif atype == 5:  # PICK_A
             res = self.ros.send_cmd(f"PICK_A {param}")
             dt = res.dt
+            reward_pick = PICK_BONUS
         else:
             dt = 0.0
 
         # Reward is negative actual elapsed time
-        reward = -float(dt) + reward_pick + reward_drop + reward_wait - penalty_charge
+        reward = -2* float(dt) + reward_pick + reward_drop + reward_wait - penalty_charge
         battery_depleted = False
 
         # Episode termination logic

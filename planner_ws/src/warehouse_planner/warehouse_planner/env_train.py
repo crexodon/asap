@@ -14,7 +14,7 @@ SUCCESS_BONUS = 1000.0
 FAIL_PENALTY = 600
 DROP_BONUS = 10
 PICK_BONUS = 10
-WAIT_PENALTY = -1
+WAIT_PENALTY = 0
 
 
 class WarehouseMDPEnv(gym.Env):
@@ -110,7 +110,7 @@ class WarehouseMDPEnv(gym.Env):
             print("WAIT")
 
         elif atype == 1:  # CHARGE
-            penalty_charge = self.model.robot_battery / 10 # large penalty if charging is performed at high battery status
+            penalty_charge = self.model.robot_battery / 5 # large penalty if charging is performed at high battery status
             res, dt = self.model.cmd("CHARGE", -1)
             if not res:
                 penalty_charge = 0.0
@@ -135,6 +135,8 @@ class WarehouseMDPEnv(gym.Env):
 
         elif atype == 5:  # PICK_A
             res, dt = self.model.cmd("PICK_A", param)
+            if res:
+                reward_pick = PICK_BONUS
             print(f"PICK_A{param}")
 
         else:
@@ -144,7 +146,7 @@ class WarehouseMDPEnv(gym.Env):
             print("invalid action!!!!")
 
         # Reward is negative actual elapsed time
-        reward = -float(dt) + reward_pick + reward_drop + reward_wait - penalty_charge
+        reward = -2*float(dt) + reward_pick + reward_drop + reward_wait - penalty_charge
         battery_depleted = False
 
         # Episode termination logic

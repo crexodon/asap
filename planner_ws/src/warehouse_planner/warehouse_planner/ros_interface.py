@@ -64,11 +64,13 @@ class WarehouseROSInterface(Node):
         # Clients
         self.cli_get_packages = self.create_client(GetPackages, "/get_packages", callback_group=self.cb_group)
         self.cli_reset = self.create_client(ResetEpisode, "/reset_episode", callback_group=self.cb_group)
+        
 
         self.sub_robot_state = self.create_subscription(RobotState, "/robot_state", self._on_robot_state, 10)
         self.sub_world_event = self.create_subscription(WorldEvent, "/world_event", self._on_world_event, 10)
 
         self.act_cmd: Optional[ActionClient] = None
+        self.act_cmd = ActionClient(self, PlannerCmd, "/planner/cmd", callback_group=self.cb_group)
 
         self._episode_start_time = time.monotonic()
 
