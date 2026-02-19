@@ -8,10 +8,8 @@ from rich.console import Console
 from rich.panel import Panel
 import time
 
-# Konstanten für das Mapping (entsprechend deiner Definition)
-STATIONS = ["A", "B", "C", "D", "E", "F", "G"]
-PACKAGE_LOCATIONS = STATIONS + ["ROBOT"]
 LIFECYCLE_STATES = ["SPAWNED", "READY", "WAITING", "PROCESSING", "FINISHED", "FAILED"]
+LOC_MAP = {0: "A", 1: "B", 2: "C", 3: "D", 4: "E", 5: "F", 6: "G", 7: "H"}
 
 class WarehouseMonitor(Node):
     def __init__(self):
@@ -20,13 +18,13 @@ class WarehouseMonitor(Node):
         self.packages = []
         self.start_time = time.monotonic()
         
-        # Subscriber für Roboter-Status
+        # Subscriber für Roboter-Daten (inkl. Position, Battery, Carrying, Last Action)
         self.create_subscription(RobotState, '/robot_state', self.robot_cb, 10)
         
-        # Service Client für Pakete
+        # Service Client für Paket-Details
         self.pkg_client = self.create_client(GetPackages, '/get_packages')
         
-        # Timer für die Paket-Updates (1Hz)
+        # Timer für Paket-Updates
         self.create_timer(1.0, self.timer_fetch_packages)
 
     def robot_cb(self, msg):
@@ -35,104 +33,99 @@ class WarehouseMonitor(Node):
     def timer_fetch_packages(self):
         if not self.pkg_client.service_is_ready():
             return
-        
         req = GetPackages.Request()
         req.all = True
-        
         future = self.pkg_client.call_async(req)
         future.add_done_callback(self.package_callback)
 
     def package_callback(self, future):
         try:
             res = future.result()
-            if res is not None:
-                # Sicherstellen, dass wir auf die Liste der Pakete zugreifen
+            if res and hasattr(res, 'packages'):
                 self.packages = res.packages
         except Exception as e:
             self.get_logger().error(f"Service call failed: {e}")
 
-    def get_elapsed_time(self):
-        return time.monotonic() - self.start_time
-
     def generate_ui(self):
-        elapsed = self.get_elapsed_time()
+        elapsed = time.monotonic() - self.start_time
         
-        # 1. Header Bereich
+        # --- Header Logik ---
         if self.robot_state:
             bat = self.robot_state.battery
             bat_col = "green" if bat > 50 else "yellow" if bat > 20 else "red"
-            # Hier nutzen wir direkt den String aus dem msg oder mappen ihn, falls es ein ID ist
-            pos = str(self.robot_state.robot_location)
             
-            header_text = (f"[bold]Zeit seit Start:[/] {elapsed:.1f}s | "
-                           f"[bold]Batterie:[/] [{bat_col}]{bat:.1f}%[/] | "
-                           f"[bold]Position:[/] [cyan]{pos}[/]")
-        else:
-            header_text = f"[bold]Zeit seit Start:[/] {elapsed:.1f}s | [blink red]Warte auf RobotState...[/]"
+            # Carrying Info
+            c_idx = getattr(self.robot_state, 'carrying_idx', -1)
+            carrying_str = f"Paket {c_idx}" if c_idx != -1 else "Leer"
+            
+            # Action Info (Überschreibt sich automatisch, da wir nur den aktuellen State anzeigen)
+            last_action = getattr(self.robot_state, 'last_action', "Warte...")
 
-        # 2. Paket Tabelle
+            header_text = (f"[bold]Zeit:[/] {elapsed:.1f}s | "
+                           f"[bold]Batterie:[/] [{bat_col}]{bat:.1f}%[/] | "
+                           f"[bold]Pos:[/] {self.robot_state.robot_location} | "
+                           f"[bold]Carrying:[/] [cyan]{carrying_str}[/] | "
+                           f"[bold]Action:[/] [magenta]{last_action}[/]")
+        else:
+            header_text = f"[bold]Zeit:[/] {elapsed:.1f}s | Warte auf RobotState..."
+
+        # --- Tabelle ---
         table = Table(show_header=True, header_style="bold magenta", expand=True)
-        table.add_column("Pkg ID", justify="right", style="cyan")
+        table.add_column("Pkg ID", justify="right", style="cyan", width=8)
         table.add_column("Location", justify="center")
         table.add_column("Lifecycle State", justify="center")
-        table.add_column("Availability", justify="center")
+        table.add_column("Availability", justify="center", width=12)
 
         if not self.packages:
-            table.add_row("?", "Lade Paketdaten...", "?", "?")
+            table.add_row("-", "Lade Paketdaten...", "-", "-")
         else:
-            # Sortierung nach ID für eine stabile Anzeige
             sorted_pkgs = sorted(self.packages, key=lambda p: p.package_idx)
             for p in sorted_pkgs:
-                # --- Location Mapping ---
-                # Wenn current_location ein Index ist, mappen wir ihn auf PACKAGE_LOCATIONS
+                # Lifecycle
+                raw_state = p.lifecycle_state
                 try:
-                    loc_idx = int(p.current_location)
-                    loc_str = PACKAGE_LOCATIONS[loc_idx] if loc_idx < len(PACKAGE_LOCATIONS) else f"ID:{loc_idx}"
-                except (ValueError, TypeError):
-                    # Falls es bereits ein String ist (z.B. "A")
-                    loc_str = str(p.current_location)
-
-                # --- Lifecycle Mapping ---
-                try:
-                    ls_idx = int(p.lifecycle_state)
-                    ls_str = LIFECYCLE_STATES[ls_idx] if ls_idx < len(LIFECYCLE_STATES) else f"ID:{ls_idx}"
-                except (ValueError, TypeError):
-                    ls_str = str(p.lifecycle_state)
+                    ls_idx = int(raw_state)
+                    ls_str = LIFECYCLE_STATES[ls_idx] if ls_idx < len(LIFECYCLE_STATES) else str(ls_idx)
+                except ValueError:
+                    ls_str = str(raw_state)
                 
-                # Styling für Lifecycle
+                # Location Mapping
+                raw_loc = p.current_location
+                try:
+                    loc_idx = int(raw_loc)
+                    loc_str = LOC_MAP.get(loc_idx, f"Station {loc_idx}")
+                except ValueError:
+                    loc_str = str(raw_loc)
+                
+                # Style
                 status_style = "green" if ls_str == "FINISHED" else "white"
                 if ls_str == "FAILED": status_style = "bold red"
-                if ls_str == "PROCESSING": status_style = "yellow"
-                
-                # Availability Icon
-                avail = "✅ [green]YES" if p.availability else "❌ [red]NO"
+                if ls_str == "PROCESSING": status_style = "blue"
                 
                 table.add_row(
                     str(p.package_idx),
                     loc_str,
                     f"[{status_style}]{ls_str}[/]",
-                    avail
+                    "✅" if p.availability else "❌"
                 )
         
-        return Panel(table, title=header_text, title_align="left", subtitle="[italic]Warehouse Real-Time Monitor[/]")
+        return Panel(table, title=header_text, subtitle="Warehouse Real-Time Monitor", border_style="blue")
 
 def main():
     rclpy.init()
     monitor = WarehouseMonitor()
     console = Console()
     
-    with Live(console=console, refresh_per_second=4, auto_refresh=True) as live:
+    with Live(console=console, refresh_per_second=4) as live:
         try:
             while rclpy.ok():
-                # Verarbeitet ROS Callbacks
-                rclpy.spin_once(monitor, timeout_sec=0.05)
-                # UI Update
+                rclpy.spin_once(monitor, timeout_sec=0.1)
                 live.update(monitor.generate_ui())
         except KeyboardInterrupt:
             pass
-        finally:
-            monitor.destroy_node()
-            rclpy.shutdown()
+
+    monitor.destroy_node()
+    rclpy.shutdown()
 
 if __name__ == '__main__':
     main()
