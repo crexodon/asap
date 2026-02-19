@@ -45,7 +45,7 @@ class Simulator:
 
         # package states
         self.num_packages = 20
-        self.spawn_freq = 20 # evry 20 seconds
+        self.spawn_freq = 20 # every 20 seconds
 
         self.seed = 0
 
