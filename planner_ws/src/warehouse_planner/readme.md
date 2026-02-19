@@ -62,3 +62,9 @@ ros2 run warehouse_planner planner_inference_node --ros-args \
   -p model_path:=/home/norika-schneider/asap/planner_ws/src/warehouse_planner/models/model2.zip \
   -p max_episode_time_s:=1000.0
 ```
+
+## Benchmarking
+
+Run benchmark_planner.py for iterative processing.
+
+Run planner_inference_node_benchmark.py for benchmarking the PPO.
