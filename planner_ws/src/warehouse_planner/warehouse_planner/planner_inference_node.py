@@ -3,21 +3,14 @@ from __future__ import annotations
 import os
 import time
 from pathlib import Path
+import threading
 
-import numpy as np
 import rclpy
 from rclpy.executors import MultiThreadedExecutor
 
-from .constants import FLAT_ACTIONS_N
 from .env import WarehouseMDPEnv
 from .masking import compute_action_mask, flat_to_type_param, station_param_to_station
 from .ros_interface import WarehouseROSInterface
-
-from rich.live import Live
-from rich.table import Table
-from rich.console import Console
-from rich.layout import Layout
-from rich.panel import Panel
 
 
 
@@ -54,10 +47,9 @@ def main():
     ros = WarehouseROSInterface()
 
     ros.declare_parameter("model_path", str(_resolve_default_model_path()))
-    #ros.declare_parameter("decision_sleep_s", 0.05)
 
     model_path = Path(str(ros.get_parameter("model_path").value))
-    #decision_sleep_s = float(ros.get_parameter("decision_sleep_s").value)
+
     decision_sleep_s = 0.0
 
     try:
@@ -70,29 +62,11 @@ def main():
 
     env = WarehouseMDPEnv(ros)
 
-    # If user provided a relative path, resolve it against CWD
-    if not model_path.is_absolute():
-       model_path = (Path(os.getcwd()) / model_path).resolve()
-
-    if not model_path.exists():
-        ros.get_logger().error(f"Model file not found: {model_path}")
-        ros.get_logger().error(
-            "Tip: train node can save to the same path via '--ros-args -p model_path:=...'"
-        )
-        ros.get_logger().error(
-            f"Default locations checked: {Path(os.getcwd()) / 'warehouse_planner_models' / 'model.zip'} "
-            f"and <pkg_share>/models/model.zip"
-        )
-        raise FileNotFoundError(str(model_path))
-
     ros.get_logger().info(f"Loading model: {model_path}")
     model = MaskablePPO.load(str(model_path), env=env)
 
     executor = MultiThreadedExecutor(num_threads=4)
     executor.add_node(ros)
-
-    # Spin in background so callbacks keep state fresh
-    import threading
 
     spin_thread = threading.Thread(target=executor.spin, daemon=True)
     spin_thread.start()
@@ -131,7 +105,7 @@ def main():
             if terminated or truncated:
                 end_wall_time = time.monotonic()
                 wall_time_duration = end_wall_time - start_wall_time
-                sim_time_duration = ros.episode_elapsed_s() # Zeit aus dem ROS-Interface
+                sim_time_duration = ros.episode_elapsed_s()
                 
                 status = "SUCCESSFUL" if terminated and not info.get('battery_depleted') else "CANCELED"
                 

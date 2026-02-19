@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 
@@ -23,10 +22,10 @@ class StopOnMaxEpisodes(BaseCallback):
         self.episodes = 0
 
     def _on_step(self) -> bool:
-        # In SB3 liegt "dones" bei VecEnv in self.locals
+
         dones = self.locals.get("dones")
         if dones is not None:
-            # bei n_envs>1 könnten mehrere true sein
+
             self.episodes += int(dones.sum()) if hasattr(dones, "sum") else int(any(dones))
         else:
             done = self.locals.get("done")
@@ -42,11 +41,9 @@ class StopOnMaxEpisodes(BaseCallback):
 
 def main():
 
-
     total_timesteps = 6_000_000
-    save_name = "model.zip"
     max_episodes = 10_000
-    max_episode_time_s = 600
+    max_episode_time_s = 1000
     wait_cancel_immediately = True
 
     headless = Simulator()
@@ -82,13 +79,8 @@ def main():
         callback=callback,
         progress_bar=True,
     )
-
     
-    # Definiere den Pfad zur Datei
     print(f"Saving model to: {model_path}")
-
-
-    # Jetzt kannst du sicher speichern
     model.save(model_path)
 
 

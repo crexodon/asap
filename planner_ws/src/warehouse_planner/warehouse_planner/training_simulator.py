@@ -360,10 +360,10 @@ class Simulator:
 
 
 
-        self.max_episode_time_s = 600.0
+        self.max_episode_time_s = 1000.0
         self.time = 0.0
 
-    def build_encoded_state(self, delta_time):
+    def build_encoded_state(self, time):
         pkgs_res = self.packages
         if pkgs_res is None:
             return None
@@ -392,7 +392,7 @@ class Simulator:
             battery_status=float(self.robot_battery),
             robot_location=safe_idx(ROBOT_LOCATION_TO_IDX, str(self.robot_location), 0),
             robot_carrying_idx=self.robot_carrying,
-            delta_time=float(delta_time),
+            time=float(time),
             package_location=loc,
             package_next_station=nxt,
             package_shipping_type=ship,

@@ -26,10 +26,7 @@ def station_param_to_station(param: int) -> str:
 
 
 def compute_action_mask(obs: dict) -> np.ndarray:
-    """Compute boolean mask for flattened Discrete(120) action space.
 
-    The obs is the numeric dict produced by EncodedState.as_dict().
-    """
     mask = np.zeros((FLAT_ACTIONS_N,), dtype=bool)
 
     # Extract basics
@@ -48,13 +45,12 @@ def compute_action_mask(obs: dict) -> np.ndarray:
     station_e_idx = ROBOT_LOCATION_TO_IDX["E"]
 
 
-    # If robot is in transit, no commands should be set (safety):
-    # only MOVE_A remains available.
+    # If robot is in transit, only MOVE_A remains available.
     if robot_loc_idx == on_transit_idx:
         mask[type_param_to_flat(2, STATIONS.index("A"))] = True
         return mask
     
-    # WAIT only not carrying a package
+    # WAIT only if not carrying a package
     if carrying == -1:
         mask[type_param_to_flat(0, 0)] = True
     
@@ -65,17 +61,17 @@ def compute_action_mask(obs: dict) -> np.ndarray:
     if 1 <= robot_loc_idx <= len(STATIONS):
         current_station_param = robot_loc_idx - 1
 
-    # CHARGE only when at F and battery < 95 (avoid double-charging at full)
+    # CHARGE only when at F and battery < 50 (avoid double-charging at full)
     if robot_loc_idx == station_f_idx and battery < 50.0:
          for p in range(20):
              mask[type_param_to_flat(1, 0)] = True
 
-    # MOVE_TO (only when not ON_TRANSIT - already returned above)
+    # MOVE_TO only when not ON_TRANSIT
     station_param_f = STATIONS.index("F")  # 5
     allow_f = (battery < 50.0)
 
     if carrying == -1:
-        # MOVE_TO A only if empty (we are empty here)
+        # MOVE_TO A only if empty 
         mask[type_param_to_flat(2, STATIONS.index("A"))] = True
 
         # MOVE_TO B/C/G only if there exists at least one package currently located there
@@ -88,8 +84,6 @@ def compute_action_mask(obs: dict) -> np.ndarray:
         d_idx = PACKAGE_LOCATION_TO_IDX["D"]
         if np.any((pkg_loc == d_idx) & (pkg_avail == 1)):
             mask[type_param_to_flat(2, STATIONS.index("D"))] = True
-
-        # MOVE_TO E only if carrying != -1 (never here), so do nothing
 
         # MOVE_TO F only if battery < 50
         if allow_f:
@@ -105,18 +99,16 @@ def compute_action_mask(obs: dict) -> np.ndarray:
             mask[type_param_to_flat(2, station_param_f)] = True
 
     
-    # Forbid MOVE_TO to the station where the robot already is (no-op move).
-    # Apply after MOVE_TO candidates have been enabled, so it works for both
-    # "carrying" and "not carrying" branches.
+    # Forbid MOVE_TO to the station where the robot already is 
     if current_station_param is not None and 0 <= current_station_param <= 6:
         mask[type_param_to_flat(2, current_station_param)] = False
-    # PICK (explicitly only at B, C, D, G)
+    # PICK only at B, C, D, G
     # - robot_loc in {B,C,D,G}
     # - carrying == -1
     # - package at same station AND availability True
     if carrying == -1:
         allowed_pick_stations = {"B", "C", "D", "G"}
-        # resolve current station name
+        
         station_name = None
         for k, v in ROBOT_LOCATION_TO_IDX.items():
             if v == robot_loc_idx:
@@ -132,10 +124,9 @@ def compute_action_mask(obs: dict) -> np.ndarray:
     # - robot_loc in {B,C,D,E,G}
     # - carrying != -1
     # - only DROP carrying
-    # - only if next_station of carried pkg == current station (and next != FINISH)
+    # - only if next_station of carried pkg == current station and next != FINISH
     if carrying != -1 and robot_loc_idx not in (station_a_idx, station_f_idx):
 
-         # robot station name
         station_name = None
         for k, v in ROBOT_LOCATION_TO_IDX.items():
             if v == robot_loc_idx:
@@ -156,34 +147,5 @@ def compute_action_mask(obs: dict) -> np.ndarray:
         for i in range(20):
             if int(pkg_loc[i]) == a_idx and int(pkg_avail[i]) == 1:
                 mask[type_param_to_flat(5, i)] = True
-
-    if DEBUG_MASK:
-            allowed = np.where(mask)[0]
-
-            def flat_to_str(a):
-                atype = int(a) // 20
-                param = int(a) % 20
-                # Korrektur: Zugriff auf Liste statt .get()
-                if 0 <= atype < len(ACTION_TYPES):
-                    name = ACTION_TYPES[atype]
-                else:
-                    name = f"UNK({atype})"
-                return f"{name}({param})"
-
-            # Resolve robot location name
-            loc_name = "UNKNOWN"
-            for k, v in ROBOT_LOCATION_TO_IDX.items():
-                if v == robot_loc_idx:
-                    loc_name = k
-                    break
-
-            print("\n[Mask Debug]")
-            print(f"  episode_step: {episode_step}")
-            print(f"  robot_location: {loc_name}")
-            print(f"  carrying: {carrying}")
-            print(f"  battery: {battery:.1f}")
-            print(f"  allowed_actions ({len(allowed)}):")
-            for a in allowed:
-                print(f"    - {flat_to_str(a)}")
 
     return mask

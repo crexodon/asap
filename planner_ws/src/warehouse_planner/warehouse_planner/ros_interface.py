@@ -3,9 +3,8 @@ from __future__ import annotations
 import threading
 import time
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Optional
 
-import rclpy
 from rclpy.action import ActionClient
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.node import Node
@@ -15,12 +14,7 @@ from interfaces.srv import GetPackages, ResetEpisode
 
 import numpy as np
 
-
-try:
-    # Expected by your specification
-    from interfaces.action import PlannerCmd
-except Exception:  # pragma: no cover
-    PlannerCmd = None  # type: ignore
+from interfaces.action import PlannerCmd
 
 from .constants import STATIONS
 from .encoding import (
@@ -44,13 +38,6 @@ class CmdResult:
 
 class WarehouseROSInterface(Node):
     """ROS2 interface node.
-
-    - Caches /robot_state
-    - Provides synchronous helpers for /get_packages, /reset_episode and /planner/cmd
-    - Provides WAIT interruption via /world_event (PROCESS_STARTED / PROCESS_FINISHED)
-
-    Note: WAIT is treated internally (no blocking action goal), but we still send
-    a "WAIT" goal for logging and immediately cancel it (to avoid piling up goals).
     """
 
     def __init__(self):
@@ -82,12 +69,6 @@ class WarehouseROSInterface(Node):
         self.sub_world_event = self.create_subscription(WorldEvent, "/world_event", self._on_world_event, 10)
 
         self.act_cmd: Optional[ActionClient] = None
-        if PlannerCmd is not None:
-            self.act_cmd = ActionClient(self, PlannerCmd, "/planner/cmd", callback_group=self.cb_group)
-        else:
-            self.get_logger().warning(
-                "Could not import interfaces.action.PlannerCmd. /planner/cmd client will be disabled."
-            )
 
         self._episode_start_time = time.monotonic()
 
@@ -100,7 +81,7 @@ class WarehouseROSInterface(Node):
     def _on_world_event(self, msg: WorldEvent):
         if msg.event_type not in ("PROCESS_STARTED", "PROCESS_FINISHED"):
             return
-        # Only the first relevant event should interrupt WAIT; subsequent ones are ignored until WAIT restarts.
+
         with self._event_cv:
             if self._last_interrupt_event_time is None:
                 self._last_interrupt_event_time = time.monotonic()
@@ -152,7 +133,7 @@ class WarehouseROSInterface(Node):
         return float(time.monotonic() - self._episode_start_time)
 
     def send_cmd(self, cmd: str, timeout_s: float = 60.0) -> CmdResult:
-        """Send a non-WAIT command and block until result."""
+
         if self.act_cmd is None:
             return CmdResult(False, 0.0, "NO_ACTION_CLIENT")
 
@@ -177,7 +158,7 @@ class WarehouseROSInterface(Node):
         t1 = time.monotonic()
         while not result_future.done():
             if time.monotonic() - t1 > timeout_s:
-                # Attempt cancel
+
                 try:
                     goal_handle.cancel_goal_async()
                 except Exception:
@@ -194,11 +175,7 @@ class WarehouseROSInterface(Node):
         return CmdResult(ok, float(res.dt), str(res.result))
 
     def send_wait_for_logging(self) -> None:
-        """Send WAIT command only for logging.
 
-        We don't rely on the result. By default we cancel immediately to avoid
-        accumulating long-running goals on the server.
-        """
         if self.act_cmd is None:
             return
         if not self.act_cmd.wait_for_server(timeout_sec=0.1):
@@ -224,10 +201,7 @@ class WarehouseROSInterface(Node):
         send_future.add_done_callback(_done_cb)
 
     def wait_for_interrupt_event(self, timeout_s: Optional[float] = None) -> Optional[float]:
-        """Block until first PROCESS_STARTED/FINISHED event arrives.
 
-        Returns real elapsed seconds spent waiting.
-        """
         with self._event_cv:
             self._last_interrupt_event_time = None
             t0 = time.monotonic()
@@ -243,7 +217,7 @@ class WarehouseROSInterface(Node):
             return None
         return float(t1 - t0)
 
-    def build_encoded_state(self, delta_time: float) -> Optional[EncodedState]:
+    def build_encoded_state(self, time: float) -> Optional[EncodedState]:
         if not self.wait_for_robot_state(timeout_s=2.0):
             return None
 
@@ -282,7 +256,7 @@ class WarehouseROSInterface(Node):
             battery_status=float(rs.battery),
             robot_location=safe_idx(ROBOT_LOCATION_TO_IDX, str(rs.robot_location), 0),
             robot_carrying_idx=carrying,
-            delta_time=float(delta_time),
+            time=float(time),
             package_location=loc,
             package_next_station=nxt,
             package_shipping_type=ship,

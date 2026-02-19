@@ -16,12 +16,12 @@ ACTION_TYPES = [
 # idx = action_type * 20 + param
 FLAT_ACTIONS_N = len(ACTION_TYPES) * 20
 
-# Lifecycle / shipping types observed in provided nodes
+# Lifecycle / shipping types
 LIFECYCLE_STATES = ["SPAWNED", "READY", "WAITING", "PROCESSING", "FINISHED", "FAILED"]
 SHIPPING_TYPES = ["standard", "express"]
 
-# Package location includes ROBOT + stations
+# Package locations
 PACKAGE_LOCATIONS = STATIONS + ["ROBOT"]
 
-# Next-location for packages can be station id or FINISH
+# Next-locations
 NEXT_LOCATIONS = STATIONS + ["FINISH"]

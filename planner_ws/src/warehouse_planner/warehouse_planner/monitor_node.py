@@ -18,13 +18,10 @@ class WarehouseMonitor(Node):
         self.packages = []
         self.start_time = time.monotonic()
         
-        # Subscriber für Roboter-Daten (inkl. Position, Battery, Carrying, Last Action)
         self.create_subscription(RobotState, '/robot_state', self.robot_cb, 10)
         
-        # Service Client für Paket-Details
         self.pkg_client = self.create_client(GetPackages, '/get_packages')
         
-        # Timer für Paket-Updates
         self.create_timer(1.0, self.timer_fetch_packages)
 
     def robot_cb(self, msg):
@@ -49,7 +46,6 @@ class WarehouseMonitor(Node):
     def generate_ui(self):
         elapsed = time.monotonic() - self.start_time
         
-        # --- Header Logik ---
         if self.robot_state:
             bat = self.robot_state.battery
             bat_col = "green" if bat > 50 else "yellow" if bat > 20 else "red"
@@ -58,7 +54,7 @@ class WarehouseMonitor(Node):
             c_idx = getattr(self.robot_state, 'carrying_idx', -1)
             carrying_str = f"Paket {c_idx}" if c_idx != -1 else "Leer"
             
-            # Action Info (Überschreibt sich automatisch, da wir nur den aktuellen State anzeigen)
+            # Action Info 
             last_action = getattr(self.robot_state, 'last_action', "Warte...")
 
             header_text = (f"[bold]Zeit:[/] {elapsed:.1f}s | "
@@ -69,7 +65,7 @@ class WarehouseMonitor(Node):
         else:
             header_text = f"[bold]Zeit:[/] {elapsed:.1f}s | Warte auf RobotState..."
 
-        # --- Tabelle ---
+        # --- Table ---
         table = Table(show_header=True, header_style="bold magenta", expand=True)
         table.add_column("Pkg ID", justify="right", style="cyan", width=8)
         table.add_column("Location", justify="center")

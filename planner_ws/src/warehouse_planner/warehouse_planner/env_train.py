@@ -19,35 +19,20 @@ WAIT_PENALTY = -1
 
 class WarehouseMDPEnv(gym.Env):
     """
-    anstatt env.py
-    Gymnasium env backed by a running ROS2 simulation.
-
-    Observations are a Dict compatible with SB3 MultiInputPolicy.
-    Actions are flattened to Discrete(120) to ensure compatibility with
-    sb3_contrib MaskablePPO. The encoding corresponds to a logical MultiDiscrete
-    (action_type, param) with:
-      - action_type in {WAIT, CHARGE, MOVE_TO, PICK, DROP, PICK_A}
-      - param in 0..19 (MOVE_TO uses 0..6 -> A..G)
-
-    WAIT is handled internally: we still send a "WAIT" cmd for logging, but the
-    step blocks until the first PROCESS_STARTED/PROCESS_FINISHED world event.
+    Gymnasium env backed for training
     """
-
-    metadata = {"render_modes": []}
 
     def __init__(self, model: Simulator):
         self.model = model
         self.action_space = gym.spaces.Discrete(FLAT_ACTIONS_N)
 
         # Observation space
-        # Note: battery is 0..100 (per your correction)
         self.observation_space = gym.spaces.Dict(
             {
                 "battery_status": gym.spaces.Box(low=0.0, high=100.0, shape=(1,), dtype=np.float32),
                 "robot_location": gym.spaces.Box(low=0, high=7, shape=(1,), dtype=np.int64),
                 "robot_carrying_idx": gym.spaces.Box(low=-1, high=19, shape=(1,), dtype=np.int64),
-                "episode_step": gym.spaces.Box(low=0, high=1_000_000, shape=(1,), dtype=np.int64),
-                "delta_time": gym.spaces.Box(low=0.0, high=100, shape=(1,), dtype=np.float32),
+                "time": gym.spaces.Box(low=0.0, high=1000, shape=(1,), dtype=np.float32),
                 "package_location": gym.spaces.Box(low=0, high=7, shape=(20,), dtype=np.int64),
                 "package_next_station": gym.spaces.Box(low=0, high=7, shape=(20,), dtype=np.int64),
                 "package_shipping_type": gym.spaces.Box(low=0, high=1, shape=(20,), dtype=np.int64),
@@ -57,15 +42,14 @@ class WarehouseMDPEnv(gym.Env):
         )
 
         self._episode_step: int = 0
-
         self._last_step_time = model.time
         self._last_delta_time = 0.0
-        # Initialize with a zero observation so action_masks() is safe before first reset().
+
         self._last_obs = {
             "battery_status": np.array([0.0], dtype=np.float32),
             "robot_location": np.array([0], dtype=np.int64),
             "robot_carrying_idx": np.array([-1], dtype=np.int64),
-            "delta_time": np.array([0.0], dtype=np.float32),
+            "time": np.array([0.0], dtype=np.float32),
             "package_location": np.zeros((20,), dtype=np.int64),
             "package_next_station": np.zeros((20,), dtype=np.int64),
             "package_shipping_type": np.zeros((20,), dtype=np.int64),
@@ -73,19 +57,18 @@ class WarehouseMDPEnv(gym.Env):
             "package_availability": np.zeros((20,), dtype=np.int64),
         }
 
-    # SB3-contrib hook
     def action_masks(self) -> np.ndarray:
         return compute_action_mask(self._last_obs)
 
-    def _get_obs(self, delta_time: float) -> Dict[str, np.ndarray]:
-        st = self.model.build_encoded_state(delta_time=delta_time)
+    def _get_obs(self, time: float) -> Dict[str, np.ndarray]:
+        st = self.model.build_encoded_state(time=time)
         if st is None:
             # Fallback empty state
             st = EncodedState(
                 battery_status=0.0,
                 robot_location=0,
                 robot_carrying_idx=-1,
-                delta_time=float(delta_time),
+                time=float(time),
                 package_location=np.zeros((20,), dtype=np.int64),
                 package_next_station=np.zeros((20,), dtype=np.int64),
                 package_shipping_type=np.zeros((20,), dtype=np.int64),
@@ -93,16 +76,16 @@ class WarehouseMDPEnv(gym.Env):
                 package_availability=np.zeros((20,), dtype=np.int64),
             )
         obs = st.as_dict()
-        obs["episode_step"] = np.array([self._episode_step], dtype=np.int64)
+
         return obs
 
     def reset(self, seed: int | None = None, options: dict | None = None):
 
         self.model.reset()
 
-        # 3) Build obs with delta_time = 0.0 at the beginning of episode
+        # Build obs with time = 0.0 at the beginning of episode
         self._episode_step = 0
-        obs = self._get_obs(delta_time=0.0)
+        obs = self._get_obs(time=0.0)
         info = {"reset_ok": True}
         return obs, info
 
@@ -117,8 +100,6 @@ class WarehouseMDPEnv(gym.Env):
         reward_pick = 0.0
         reward_drop = 0.0
         reward_wait = 0.0
-
-
 
         # Execute action
         if atype == 0:  # WAIT
@@ -172,9 +153,7 @@ class WarehouseMDPEnv(gym.Env):
             reward -= FAIL_PENALTY
             print("battery is empty")
 
-        # Success bonus (only if we are terminating successfully)
-        # Note: if both battery_depleted and is_done could be True (shouldn't happen),
-        # failure penalty already applied; you can prioritize one explicitly if needed.
+        # Success bonus 
         if terminated and (not battery_depleted) and self.model.is_done():
             reward += SUCCESS_BONUS
             print("SUCCESSFUL")
@@ -186,7 +165,7 @@ class WarehouseMDPEnv(gym.Env):
         # Update obs
         self._last_delta_time = dt
         self._last_step_time = self.model.time
-        self._last_obs = self._get_obs(delta_time=dt)
+        self._last_obs = self._get_obs(time=self.model.time)
         info = {"dt": float(dt)}
         self._episode_step += 1
         return self._last_obs, reward, terminated, truncated, info
