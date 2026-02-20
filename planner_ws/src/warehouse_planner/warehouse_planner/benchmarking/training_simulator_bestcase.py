@@ -118,14 +118,14 @@ class Simulator:
                     self.output_queues[s_idx].append(p_idx)
                     self.packages[p_idx].lifecycle_state = "READY"
                     self.packages[p_idx].availability = True
-                    success = (self.rng.random() < 0.80)
+                    success = True
                     if success:
                         self.packages[p_idx].next_location = "C"
                     else:
                         self.packages[p_idx].next_location = "G"
 
                 elif s_idx == 2: # C
-                    success = (self.rng.random() < 0.95)
+                    success = True
                     if success:
                         self.output_queues[s_idx].append(p_idx)
                         self.packages[p_idx].lifecycle_state = "READY"
@@ -138,7 +138,7 @@ class Simulator:
                         # put back to input queue
                         self.packages[p_idx].lifecycle_state = "WAITING"
                         self.packages[p_idx].availability = False
-                        dt = 1.0 * self.rng.random() + 1.5 # U(1.5,2.5)
+                        dt = 1.5 # U(1.5,2.5)
                             # check if input_queue is empty
                         if not self.input_queues[s_idx]:
                             start_time = self.time # start immediately
@@ -151,7 +151,7 @@ class Simulator:
                         self.process_time_end[s_idx].append(start_time + dt)
 
                 elif s_idx == 3: # D
-                    success = (self.rng.random() < 0.85)
+                    success = True
                     if success:
                         self.packages[p_idx].next_location = "FINISH"
                         self.packages[p_idx].lifecycle_state = "FINISHED"
@@ -167,7 +167,7 @@ class Simulator:
                         self.packages[p_idx].next_location = "FINISH"
                         self.packages[p_idx].availability = False
                     else:
-                        success = (self.rng.random() < 0.85)
+                        success = True
                         if success:
                             self.packages[p_idx].next_location = "FINISH"
                             self.packages[p_idx].lifecycle_state = "FINISHED"
@@ -207,9 +207,16 @@ class Simulator:
             location_idx = LOCATION_TO_INT[self.robot_location]
             idx = int(param)
             self.robot_location = STATIONS[idx]
-            self.time += self.move_to_times[location_idx][param]
+            if location_idx == 0:
+                move_from = "START"
+            else:
+                move_from = f"STATION_{location_idx}"
+            move_to = f"STATION_{STATIONS[idx]}"
+            key = f"'{move_from}', '{move_to}"
+            move_to_time = self.move_to_data["paths"][key]["time"]
+            self.time += move_to_time
             result = True
-            time_delta = self.move_to_times[location_idx][param]
+            time_delta = move_to_time
 
         elif cmd == "PICK":
             # check if robot is idle and package is available
@@ -248,18 +255,18 @@ class Simulator:
 
                 # calculate time for processes
                 if self.robot_location == "B":
-                    dt = 1.0 * self.rng.random() + 1.5 # U(1.5,2.5)
+                    dt = 1.5 # U(1.5,2.5)
                 elif self.robot_location == "C":
-                    dt = 1.0 * self.rng.random() + 1.5 # U(1.5,2.5)
+                    dt = 1.5 # U(1.5,2.5)
                 elif self.robot_location == "D":
-                    dt = 1.0 * self.rng.random() + 1.0 # U(1.0,2.0)
+                    dt = 1.0 # U(1.0,2.0)
                 elif self.robot_location == "E":
                     if self.packages[param].lifecycle_state == "FAILED":
                         dt = 0
                     else:
-                        dt = 1.0 * self.rng.random() + 1.0 # U(1.0,2.0)
+                        dt = 1.0 # U(1.0,2.0)
                 elif self.robot_location == "G":
-                    dt = 2.0 * self.rng.random() + 2.0 # U(2.0,4.0)
+                    dt = 2.0 # U(2.0,4.0)
                 else:
                     print("drop is not vaild")
                     dt = 0
@@ -293,9 +300,9 @@ class Simulator:
                 station_idx = LOCATION_TO_INT[self.robot_location] -1
                 while True:
                     attempt += 1
-                    pick_time = 1.0 * self.rng.random() + 1.0 # U(1.0,2.0)
+                    pick_time = 1.0 # U(1.0,2.0)
                     dt += pick_time
-                    success = (self.rng.random() < 0.95)
+                    success = True
                     if success:
                         break
                 self.output_queues[station_idx].remove(param)

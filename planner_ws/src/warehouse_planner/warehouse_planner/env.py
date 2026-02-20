@@ -35,7 +35,7 @@ class WarehouseMDPEnv(gym.Env):
                 "battery_status": gym.spaces.Box(low=0.0, high=100.0, shape=(1,), dtype=np.float32),
                 "robot_location": gym.spaces.Box(low=0, high=7, shape=(1,), dtype=np.int64),
                 "robot_carrying_idx": gym.spaces.Box(low=-1, high=19, shape=(1,), dtype=np.int64),
-                "time": gym.spaces.Box(low=0.0, high=1000, shape=(1,), dtype=np.float32),
+                "time": gym.spaces.Box(low=0.0, high=2000, shape=(1,), dtype=np.float32),
                 "package_location": gym.spaces.Box(low=0, high=7, shape=(20,), dtype=np.int64),
                 "package_next_station": gym.spaces.Box(low=0, high=7, shape=(20,), dtype=np.int64),
                 "package_shipping_type": gym.spaces.Box(low=0, high=1, shape=(20,), dtype=np.int64),

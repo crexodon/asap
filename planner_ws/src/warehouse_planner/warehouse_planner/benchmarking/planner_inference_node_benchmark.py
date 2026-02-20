@@ -14,17 +14,6 @@ from training_simulator import Simulator
 
 
 
-
-def _resolve_default_model_path() -> Path:
-    try:
-        from ament_index_python.packages import get_package_share_directory
-
-        share = Path(get_package_share_directory("warehouse_planner"))
-        return share / "models" / "model.zip"
-    except Exception:
-        return Path(os.getcwd()) / "warehouse_planner_models" / "model.zip"
-
-
 def _action_to_cmd(flat_action: int) -> str:
     atype, param = flat_to_type_param(int(flat_action))
     if atype == 0:
@@ -45,7 +34,7 @@ def _action_to_cmd(flat_action: int) -> str:
 def main():
     ros = Simulator()
 
-    model_path = "/home/norika-schneider/asap/planner_ws/src/warehouse_planner/models/model5.zip"
+    model_path = "/home/norika-schneider/asap/planner_ws/src/warehouse_planner/models/model.zip"
 
     decision_sleep_s = 0.0
 

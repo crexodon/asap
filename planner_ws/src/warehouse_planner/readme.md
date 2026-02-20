@@ -59,8 +59,8 @@ ros2 launch warehouse_robot warehouse_robot.launch.py
 Start the planner:
 ```bash
 ros2 run warehouse_planner planner_inference_node --ros-args \
-  -p model_path:=/home/norika-schneider/asap/planner_ws/src/warehouse_planner/models/model2.zip \
-  -p max_episode_time_s:=1000.0
+  -p model_path:=/home/norika-schneider/asap/planner_ws/src/warehouse_planner/models/model.zip \
+  -p max_episode_time_s:=2000.0
 ```
 
 ## Benchmarking

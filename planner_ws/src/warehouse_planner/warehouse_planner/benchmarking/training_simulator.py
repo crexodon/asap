@@ -2,6 +2,7 @@ from dataclasses import dataclass
 import numpy as np
 from typing import Dict, Tuple
 import math
+import json
 from mappings import LOCATION_TO_INT, INT_TO_LOCATION
 
 from encoding_train import (
@@ -48,6 +49,9 @@ class Simulator:
         self.spawn_freq = 20 # every 20 seconds
 
         self.seed = 0
+
+        with open("grid_path.json", "r") as f:
+            self.move_to_data = json.load(f)
 
         self.reset()
 
@@ -118,14 +122,14 @@ class Simulator:
                     self.output_queues[s_idx].append(p_idx)
                     self.packages[p_idx].lifecycle_state = "READY"
                     self.packages[p_idx].availability = True
-                    success = True
+                    success = (self.rng.random() < 0.80)
                     if success:
                         self.packages[p_idx].next_location = "C"
                     else:
                         self.packages[p_idx].next_location = "G"
 
                 elif s_idx == 2: # C
-                    success = True
+                    success = (self.rng.random() < 0.95)
                     if success:
                         self.output_queues[s_idx].append(p_idx)
                         self.packages[p_idx].lifecycle_state = "READY"
@@ -138,7 +142,7 @@ class Simulator:
                         # put back to input queue
                         self.packages[p_idx].lifecycle_state = "WAITING"
                         self.packages[p_idx].availability = False
-                        dt = 1.5 # U(1.5,2.5)
+                        dt = 1.0 * self.rng.random() + 1.5 # U(1.5,2.5)
                             # check if input_queue is empty
                         if not self.input_queues[s_idx]:
                             start_time = self.time # start immediately
@@ -151,7 +155,7 @@ class Simulator:
                         self.process_time_end[s_idx].append(start_time + dt)
 
                 elif s_idx == 3: # D
-                    success = True
+                    success = (self.rng.random() < 0.85)
                     if success:
                         self.packages[p_idx].next_location = "FINISH"
                         self.packages[p_idx].lifecycle_state = "FINISHED"
@@ -167,7 +171,7 @@ class Simulator:
                         self.packages[p_idx].next_location = "FINISH"
                         self.packages[p_idx].availability = False
                     else:
-                        success = True
+                        success = (self.rng.random() < 0.85)
                         if success:
                             self.packages[p_idx].next_location = "FINISH"
                             self.packages[p_idx].lifecycle_state = "FINISHED"
@@ -205,11 +209,20 @@ class Simulator:
         elif cmd == "MOVE_TO":
             # param: 0..6 -> A..G
             location_idx = LOCATION_TO_INT[self.robot_location]
+            current_location = self.robot_location
             idx = int(param)
             self.robot_location = STATIONS[idx]
-            self.time += self.move_to_times[location_idx][param]
+            if location_idx == 0:
+                move_from = "START"
+            else:
+                move_from = f"STATION_{current_location}"
+            move_to = f"STATION_{STATIONS[idx]}"
+            key = f"('{move_from}', '{move_to}')"
+            move_to_time = self.move_to_data["paths"][key]["time"]
+            self.time += move_to_time
             result = True
-            time_delta = self.move_to_times[location_idx][param]
+            time_delta = move_to_time
+            
 
         elif cmd == "PICK":
             # check if robot is idle and package is available
@@ -248,18 +261,18 @@ class Simulator:
 
                 # calculate time for processes
                 if self.robot_location == "B":
-                    dt = 1.5 # U(1.5,2.5)
+                    dt = 1.0 * self.rng.random() + 1.5 # U(1.5,2.5)
                 elif self.robot_location == "C":
-                    dt = 1.5 # U(1.5,2.5)
+                    dt = 1.0 * self.rng.random() + 1.5 # U(1.5,2.5)
                 elif self.robot_location == "D":
-                    dt = 1.0 # U(1.0,2.0)
+                    dt = 1.0 * self.rng.random() + 1.0 # U(1.0,2.0)
                 elif self.robot_location == "E":
                     if self.packages[param].lifecycle_state == "FAILED":
                         dt = 0
                     else:
-                        dt = 1.0 # U(1.0,2.0)
+                        dt = 1.0 * self.rng.random() + 1.0 # U(1.0,2.0)
                 elif self.robot_location == "G":
-                    dt = 2.0 # U(2.0,4.0)
+                    dt = 2.0 * self.rng.random() + 2.0 # U(2.0,4.0)
                 else:
                     print("drop is not vaild")
                     dt = 0
@@ -293,9 +306,9 @@ class Simulator:
                 station_idx = LOCATION_TO_INT[self.robot_location] -1
                 while True:
                     attempt += 1
-                    pick_time = 1.0 # U(1.0,2.0)
+                    pick_time = 1.0 * self.rng.random() + 1.0 # U(1.0,2.0)
                     dt += pick_time
-                    success = True
+                    success = (self.rng.random() < 0.95)
                     if success:
                         break
                 self.output_queues[station_idx].remove(param)
@@ -309,9 +322,6 @@ class Simulator:
                 time_delta = dt
 
         return result, time_delta
-
-    def get_dist_times(self, p1, p2):
-        return math.sqrt((p2[0] - p1[0])**2 + (p2[1] - p1[1])**2) / self.robot_max_speed
 
     def reset(self):
 
@@ -338,16 +348,6 @@ class Simulator:
 
         # cmd params
         self.wait_time = 1.0 # 1 second wait time 
-
-        self.move_to_times = [] # adapt if A* is finished
-        starts = [START_COORDS] + [STATION_COORDS[s] for s in STATIONS]
-        for start_pos in starts:
-            row = []
-            for target in STATIONS:
-                target_pos = STATION_COORDS[target]
-                dist = self.get_dist_times(start_pos, target_pos)
-                row.append(round(dist, 2))
-            self.move_to_times.append(row)
         
         # station params
         self.seed += 1  # for random numbers
