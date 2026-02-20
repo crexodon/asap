@@ -3,7 +3,7 @@ import numpy as np
 from typing import Dict, Tuple
 import math
 import json
-from mappings import LOCATION_TO_INT, INT_TO_LOCATION
+from mappings import LOCATION_TO_INT
 
 from encoding_train import (
     EncodedState,

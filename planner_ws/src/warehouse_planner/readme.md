@@ -17,9 +17,9 @@ pip install stable-baselines3 sb3-contrib torch gymnasium numpy
 ## Train an agent
 
 ```bash
-cd asap/planner_ws/src/warehouse_planner/warehouse_planner
+cd asap/planner_ws/src/warehouse_planner/warehouse_planner/training
 ```
-Define model_path in the the code.
+Define model name in the code: "model_name" in line 52
 
 ```bash
 nano planner_train.py
@@ -32,7 +32,11 @@ python3 planner_train.py
 ### Training Dashboard
 
 ```bash
-tensorboard --logdir /home/norika-schneider/asap/planner_ws/src/warehouse_planner/tensor_log
+cd asap/planner_ws/src/warehouse_planner
+```
+
+```bash
+tensorboard --logdir tensor_log
 ```
 
 ## Run (inference)
@@ -65,6 +69,36 @@ ros2 run warehouse_planner planner_inference_node --ros-args \
 
 ## Benchmarking
 
-Run benchmark_planner.py for iterative processing.
+Here we compare the PPO planner with an iterative planner. We use the headless environment to get quick results.
 
-Run planner_inference_node_benchmark.py for benchmarking the PPO.
+
+The iterative planner acts after following rules:
+
+- Handle packages iteratively and transport and process in required order:
+A→ B→ (G if B failed) → C →D/E → (E if D failed)
+- Before each motion check if battery is smaller than 15 % and go charging if necessary
+
+To run the iterative planner:
+
+```bash
+cd asap/planner_ws/src/warehouse_planner/warehouse_planner/benchmarking
+```
+```bash
+python3 iterative_planner.py
+```
+
+To run the PPO Planner with the headless environment for comparison:
+
+```bash
+cd asap/planner_ws/src/warehouse_planner/warehouse_planner/benchmarking
+```
+
+Define model name in the code: "model_name" in line 31
+
+```bash
+nano planner_inference_node_benchmark.py
+```
+
+```bash
+python3 planner_inference_node_benchmark.py
+```

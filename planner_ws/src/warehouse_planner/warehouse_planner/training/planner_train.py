@@ -40,21 +40,21 @@ class StopOnMaxEpisodes(BaseCallback):
 
 def main():
 
-    total_timesteps = 500_000
+    total_timesteps = 100 # 400.000
     max_episodes = 10_000
     max_episode_time_s = 2000
-    wait_cancel_immediately = True
 
     headless = Simulator()
 
     callback = StopOnMaxEpisodes(max_episodes) if max_episodes > 0 else None
 
     # define path for model
-    model_path = Path("/home/norika-schneider/asap/planner_ws/src/warehouse_planner/models/model.zip")
-    tensor_path = Path("/home/norika-schneider/asap/planner_ws/src/warehouse_planner/tensor_log")
+    model_name = "model.zip"
+    model_path_strin = f"../../models/{model_name}"
+    model_path = Path(model_path_strin)
+    tensor_path = Path("../../tensor_log")
 
     env = WarehouseMDPEnv(headless)
-
 
     if model_path.exists():
         print(f"Loading existing model: {model_path}")

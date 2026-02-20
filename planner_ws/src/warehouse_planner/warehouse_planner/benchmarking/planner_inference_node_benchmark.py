@@ -1,12 +1,6 @@
 from __future__ import annotations
 
-import os
 import time
-from pathlib import Path
-import threading
-
-import rclpy
-from rclpy.executors import MultiThreadedExecutor
 
 from env_benchmark import WarehouseMDPEnv
 from masking_train import compute_action_mask, flat_to_type_param, station_param_to_station
@@ -34,7 +28,8 @@ def _action_to_cmd(flat_action: int) -> str:
 def main():
     ros = Simulator()
 
-    model_path = "/home/norika-schneider/asap/planner_ws/src/warehouse_planner/models/model.zip"
+    model_name = "model.zip"
+    model_path = f"../../models/{model_name}"
 
     decision_sleep_s = 0.0
 
@@ -55,8 +50,6 @@ def main():
     total_reward = 0.0
     total_steps = 0
     start_wall_time = time.monotonic()
-
-
 
     while True:
         # Build action mask

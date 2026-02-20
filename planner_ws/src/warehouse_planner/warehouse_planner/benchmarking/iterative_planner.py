@@ -1,11 +1,5 @@
-# calculate the time for an iterative planner. 
+# Run with iterative planner
 
-## --- Best case scenario --- ##
-# Assumptions:
-# - All proceesses are always successful
-# - Always the minimum time was reached at all processes
-# - robot goes charging when battery capacity is lower than 15%
-# - Wait at stations until package becomes available
 
 # Station parameters
 # 0 = A
@@ -16,22 +10,12 @@
 # 5 = F
 # 6 = G
 
-## --- Realistic scenario --- ##
-# normal run
 
-bestcase = False
 
-if bestcase:
-    from training_simulator_bestcase import Simulator
-else:
-    from training_simulator import Simulator
+from training_simulator import Simulator
 
 
 battery_threshold = 15.0
-failed_A = 0
-failed_B = 0
-failed_C = 0
-failed_D = 0
 
 env = Simulator()
 for i in range(env.num_packages):
@@ -228,6 +212,8 @@ for i in range(env.num_packages):
                 
                 # drop at E
                 env.cmd("DROP", i)
+
+                break
 
     else:
         # move to E
