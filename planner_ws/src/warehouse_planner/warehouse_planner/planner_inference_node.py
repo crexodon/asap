@@ -44,6 +44,7 @@ def _action_to_cmd(flat_action: int) -> str:
 
 def main():
     rclpy.init()
+    time.sleep(30) # wait for gazebo
     ros = WarehouseROSInterface()
 
     # ros.declare_parameter("model_path", str(_resolve_default_model_path()))
