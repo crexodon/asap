@@ -2,10 +2,13 @@ import numpy as np
 import json
 import os
 from queue import PriorityQueue
-from grid_map import MapGrid, CellType, resolution, map_width, map_height
+try:
+    from .grid_map import MapGrid, CellType, resolution, map_width, map_height
+except ImportError:
+    from grid_map import MapGrid, CellType, resolution, map_width, map_height
 
-robot_width=2.0 # m
-robot_height=2.0 # m
+robot_width=1.8 # m
+robot_height=1.8 # m
 robot_speed=2.0 # m/s
 
 # Represents a A* Node
@@ -203,9 +206,13 @@ class AGridPath:
                         path.append((center_x, center_y))
                     
                     if from_name in self.grid.stations:
-                        center_x = self.grid.stations[to_name].center_x
-                        center_y = self.grid.stations[to_name].center_y
-                        path.insert(0, (center_x, center_y))
+                        station_obj = self.grid.stations[from_name]
+                        center_x, center_y = station_obj.center_x, station_obj.center_y
+                        entry_x, entry_y = station_obj.entry_point
+                        
+                        # Add entry point first, then center
+                        path.insert(0, (entry_x, entry_y))  # Entry point
+                        path.insert(0, (center_x, center_y))  # Center
                     
                     self.path_lookup[(from_name, to_name)] = path
                     successful_paths += 1
@@ -306,7 +313,7 @@ class AGridPath:
 # Helper to load from file
 class PathLoader:
     @staticmethod
-    def load_paths(filename='grid_path.json'):
+    def load_paths(filename):
         with open(filename, 'r') as f:
             data = json.load(f)
         

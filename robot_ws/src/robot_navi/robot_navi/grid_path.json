@@ -3,13 +3,13 @@
     "map_width": 18.0,
     "map_height": 16.0,
     "resolution": 2.0,
-    "robot_width": 2.0,
-    "robot_height": 2.0,
+    "robot_width": 1.8,
+    "robot_height": 1.8,
     "robot_speed": 2.0,
     "grid_width": 9,
     "grid_height": 8,
-    "robot_width_grid": 1,
-    "robot_height_grid": 1,
+    "robot_width_grid": 0,
+    "robot_height_grid": 0,
     "robot_speed_grid": 1.0
   },
   "paths": {
@@ -318,8 +318,12 @@
       "to": "STATION_B",
       "path": [
         [
-          4,
+          2,
           0
+        ],
+        [
+          2,
+          1
         ],
         [
           2,
@@ -338,16 +342,20 @@
           0
         ]
       ],
-      "length": 5,
-      "time": 4.0
+      "length": 6,
+      "time": 5.0
     },
     "('STATION_A', 'STATION_C')": {
       "from": "STATION_A",
       "to": "STATION_C",
       "path": [
         [
-          6,
+          2,
           0
+        ],
+        [
+          2,
+          1
         ],
         [
           2,
@@ -374,16 +382,20 @@
           0
         ]
       ],
-      "length": 7,
-      "time": 6.0
+      "length": 8,
+      "time": 7.0
     },
     "('STATION_A', 'STATION_D')": {
       "from": "STATION_A",
       "to": "STATION_D",
       "path": [
         [
-          8,
+          2,
           0
+        ],
+        [
+          2,
+          1
         ],
         [
           2,
@@ -418,16 +430,20 @@
           0
         ]
       ],
-      "length": 9,
-      "time": 8.0
+      "length": 10,
+      "time": 9.0
     },
     "('STATION_A', 'STATION_E')": {
       "from": "STATION_A",
       "to": "STATION_E",
       "path": [
         [
-          6,
-          7
+          2,
+          0
+        ],
+        [
+          2,
+          1
         ],
         [
           2,
@@ -474,16 +490,20 @@
           7
         ]
       ],
-      "length": 12,
-      "time": 11.0
+      "length": 13,
+      "time": 12.0
     },
     "('STATION_A', 'STATION_F')": {
       "from": "STATION_A",
       "to": "STATION_F",
       "path": [
         [
-          4,
-          7
+          2,
+          0
+        ],
+        [
+          2,
+          1
         ],
         [
           2,
@@ -522,8 +542,8 @@
           7
         ]
       ],
-      "length": 10,
-      "time": 9.0
+      "length": 11,
+      "time": 10.0
     },
     "('STATION_A', 'STATION_G')": {
       "from": "STATION_A",
@@ -531,7 +551,11 @@
       "path": [
         [
           2,
-          7
+          0
+        ],
+        [
+          2,
+          1
         ],
         [
           2,
@@ -562,16 +586,20 @@
           7
         ]
       ],
-      "length": 8,
-      "time": 7.0
+      "length": 9,
+      "time": 8.0
     },
     "('STATION_B', 'STATION_A')": {
       "from": "STATION_B",
       "to": "STATION_A",
       "path": [
         [
-          2,
+          4,
           0
+        ],
+        [
+          4,
+          1
         ],
         [
           4,
@@ -590,16 +618,20 @@
           0
         ]
       ],
-      "length": 5,
-      "time": 4.0
+      "length": 6,
+      "time": 5.0
     },
     "('STATION_B', 'STATION_C')": {
       "from": "STATION_B",
       "to": "STATION_C",
       "path": [
         [
-          6,
+          4,
           0
+        ],
+        [
+          4,
+          1
         ],
         [
           4,
@@ -618,16 +650,20 @@
           0
         ]
       ],
-      "length": 5,
-      "time": 4.0
+      "length": 6,
+      "time": 5.0
     },
     "('STATION_B', 'STATION_D')": {
       "from": "STATION_B",
       "to": "STATION_D",
       "path": [
         [
-          8,
+          4,
           0
+        ],
+        [
+          4,
+          1
         ],
         [
           4,
@@ -654,16 +690,20 @@
           0
         ]
       ],
-      "length": 7,
-      "time": 6.0
+      "length": 8,
+      "time": 7.0
     },
     "('STATION_B', 'STATION_E')": {
       "from": "STATION_B",
       "to": "STATION_E",
       "path": [
         [
-          6,
-          7
+          4,
+          0
+        ],
+        [
+          4,
+          1
         ],
         [
           4,
@@ -702,8 +742,8 @@
           7
         ]
       ],
-      "length": 10,
-      "time": 9.0
+      "length": 11,
+      "time": 10.0
     },
     "('STATION_B', 'STATION_F')": {
       "from": "STATION_B",
@@ -711,7 +751,11 @@
       "path": [
         [
           4,
-          7
+          0
+        ],
+        [
+          4,
+          1
         ],
         [
           4,
@@ -742,16 +786,20 @@
           7
         ]
       ],
-      "length": 8,
-      "time": 7.0
+      "length": 9,
+      "time": 8.0
     },
     "('STATION_B', 'STATION_G')": {
       "from": "STATION_B",
       "to": "STATION_G",
       "path": [
         [
-          2,
-          7
+          4,
+          0
+        ],
+        [
+          4,
+          1
         ],
         [
           4,
@@ -790,16 +838,20 @@
           7
         ]
       ],
-      "length": 10,
-      "time": 9.0
+      "length": 11,
+      "time": 10.0
     },
     "('STATION_C', 'STATION_A')": {
       "from": "STATION_C",
       "to": "STATION_A",
       "path": [
         [
-          2,
+          6,
           0
+        ],
+        [
+          6,
+          1
         ],
         [
           6,
@@ -826,16 +878,20 @@
           0
         ]
       ],
-      "length": 7,
-      "time": 6.0
+      "length": 8,
+      "time": 7.0
     },
     "('STATION_C', 'STATION_B')": {
       "from": "STATION_C",
       "to": "STATION_B",
       "path": [
         [
-          4,
+          6,
           0
+        ],
+        [
+          6,
+          1
         ],
         [
           6,
@@ -854,16 +910,20 @@
           0
         ]
       ],
-      "length": 5,
-      "time": 4.0
+      "length": 6,
+      "time": 5.0
     },
     "('STATION_C', 'STATION_D')": {
       "from": "STATION_C",
       "to": "STATION_D",
       "path": [
         [
-          8,
+          6,
           0
+        ],
+        [
+          6,
+          1
         ],
         [
           6,
@@ -882,8 +942,8 @@
           0
         ]
       ],
-      "length": 5,
-      "time": 4.0
+      "length": 6,
+      "time": 5.0
     },
     "('STATION_C', 'STATION_E')": {
       "from": "STATION_C",
@@ -891,7 +951,11 @@
       "path": [
         [
           6,
-          7
+          0
+        ],
+        [
+          6,
+          1
         ],
         [
           6,
@@ -922,16 +986,20 @@
           7
         ]
       ],
-      "length": 8,
-      "time": 7.0
+      "length": 9,
+      "time": 8.0
     },
     "('STATION_C', 'STATION_F')": {
       "from": "STATION_C",
       "to": "STATION_F",
       "path": [
         [
-          4,
-          7
+          6,
+          0
+        ],
+        [
+          6,
+          1
         ],
         [
           6,
@@ -970,16 +1038,20 @@
           7
         ]
       ],
-      "length": 10,
-      "time": 9.0
+      "length": 11,
+      "time": 10.0
     },
     "('STATION_C', 'STATION_G')": {
       "from": "STATION_C",
       "to": "STATION_G",
       "path": [
         [
-          2,
-          7
+          6,
+          0
+        ],
+        [
+          6,
+          1
         ],
         [
           6,
@@ -1026,16 +1098,20 @@
           7
         ]
       ],
-      "length": 12,
-      "time": 11.0
+      "length": 13,
+      "time": 12.0
     },
     "('STATION_D', 'STATION_A')": {
       "from": "STATION_D",
       "to": "STATION_A",
       "path": [
         [
-          2,
+          8,
           0
+        ],
+        [
+          8,
+          1
         ],
         [
           8,
@@ -1060,6 +1136,854 @@
         [
           3,
           1
+        ],
+        [
+          2,
+          1
+        ],
+        [
+          2,
+          0
+        ]
+      ],
+      "length": 10,
+      "time": 9.0
+    },
+    "('STATION_D', 'STATION_B')": {
+      "from": "STATION_D",
+      "to": "STATION_B",
+      "path": [
+        [
+          8,
+          0
+        ],
+        [
+          8,
+          1
+        ],
+        [
+          8,
+          1
+        ],
+        [
+          7,
+          1
+        ],
+        [
+          6,
+          1
+        ],
+        [
+          5,
+          1
+        ],
+        [
+          4,
+          1
+        ],
+        [
+          4,
+          0
+        ]
+      ],
+      "length": 8,
+      "time": 7.0
+    },
+    "('STATION_D', 'STATION_C')": {
+      "from": "STATION_D",
+      "to": "STATION_C",
+      "path": [
+        [
+          8,
+          0
+        ],
+        [
+          8,
+          1
+        ],
+        [
+          8,
+          1
+        ],
+        [
+          7,
+          1
+        ],
+        [
+          6,
+          1
+        ],
+        [
+          6,
+          0
+        ]
+      ],
+      "length": 6,
+      "time": 5.0
+    },
+    "('STATION_D', 'STATION_E')": {
+      "from": "STATION_D",
+      "to": "STATION_E",
+      "path": [
+        [
+          8,
+          0
+        ],
+        [
+          8,
+          1
+        ],
+        [
+          8,
+          1
+        ],
+        [
+          8,
+          2
+        ],
+        [
+          8,
+          3
+        ],
+        [
+          8,
+          4
+        ],
+        [
+          8,
+          5
+        ],
+        [
+          8,
+          6
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          6,
+          7
+        ]
+      ],
+      "length": 11,
+      "time": 10.0
+    },
+    "('STATION_D', 'STATION_F')": {
+      "from": "STATION_D",
+      "to": "STATION_F",
+      "path": [
+        [
+          8,
+          0
+        ],
+        [
+          8,
+          1
+        ],
+        [
+          8,
+          1
+        ],
+        [
+          8,
+          2
+        ],
+        [
+          8,
+          3
+        ],
+        [
+          8,
+          4
+        ],
+        [
+          8,
+          5
+        ],
+        [
+          8,
+          6
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          4,
+          7
+        ]
+      ],
+      "length": 13,
+      "time": 12.0
+    },
+    "('STATION_D', 'STATION_G')": {
+      "from": "STATION_D",
+      "to": "STATION_G",
+      "path": [
+        [
+          8,
+          0
+        ],
+        [
+          8,
+          1
+        ],
+        [
+          8,
+          1
+        ],
+        [
+          8,
+          2
+        ],
+        [
+          8,
+          3
+        ],
+        [
+          8,
+          4
+        ],
+        [
+          8,
+          5
+        ],
+        [
+          8,
+          6
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          3,
+          6
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          2,
+          7
+        ]
+      ],
+      "length": 15,
+      "time": 14.0
+    },
+    "('STATION_E', 'STATION_A')": {
+      "from": "STATION_E",
+      "to": "STATION_A",
+      "path": [
+        [
+          6,
+          7
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          3,
+          6
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          2
+        ],
+        [
+          2,
+          1
+        ],
+        [
+          2,
+          0
+        ]
+      ],
+      "length": 13,
+      "time": 12.0
+    },
+    "('STATION_E', 'STATION_B')": {
+      "from": "STATION_E",
+      "to": "STATION_B",
+      "path": [
+        [
+          6,
+          7
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          6,
+          5
+        ],
+        [
+          6,
+          4
+        ],
+        [
+          6,
+          3
+        ],
+        [
+          6,
+          2
+        ],
+        [
+          6,
+          1
+        ],
+        [
+          5,
+          1
+        ],
+        [
+          4,
+          1
+        ],
+        [
+          4,
+          0
+        ]
+      ],
+      "length": 11,
+      "time": 10.0
+    },
+    "('STATION_E', 'STATION_C')": {
+      "from": "STATION_E",
+      "to": "STATION_C",
+      "path": [
+        [
+          6,
+          7
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          6,
+          5
+        ],
+        [
+          6,
+          4
+        ],
+        [
+          6,
+          3
+        ],
+        [
+          6,
+          2
+        ],
+        [
+          6,
+          1
+        ],
+        [
+          6,
+          0
+        ]
+      ],
+      "length": 9,
+      "time": 8.0
+    },
+    "('STATION_E', 'STATION_D')": {
+      "from": "STATION_E",
+      "to": "STATION_D",
+      "path": [
+        [
+          6,
+          7
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          6,
+          5
+        ],
+        [
+          6,
+          4
+        ],
+        [
+          6,
+          3
+        ],
+        [
+          6,
+          2
+        ],
+        [
+          6,
+          1
+        ],
+        [
+          7,
+          1
+        ],
+        [
+          8,
+          1
+        ],
+        [
+          8,
+          0
+        ]
+      ],
+      "length": 11,
+      "time": 10.0
+    },
+    "('STATION_E', 'STATION_F')": {
+      "from": "STATION_E",
+      "to": "STATION_F",
+      "path": [
+        [
+          6,
+          7
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          4,
+          7
+        ]
+      ],
+      "length": 6,
+      "time": 5.0
+    },
+    "('STATION_E', 'STATION_G')": {
+      "from": "STATION_E",
+      "to": "STATION_G",
+      "path": [
+        [
+          6,
+          7
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          3,
+          6
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          2,
+          7
+        ]
+      ],
+      "length": 8,
+      "time": 7.0
+    },
+    "('STATION_F', 'STATION_A')": {
+      "from": "STATION_F",
+      "to": "STATION_A",
+      "path": [
+        [
+          4,
+          7
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          4
+        ],
+        [
+          4,
+          3
+        ],
+        [
+          4,
+          2
+        ],
+        [
+          4,
+          1
+        ],
+        [
+          3,
+          1
+        ],
+        [
+          2,
+          1
+        ],
+        [
+          2,
+          0
+        ]
+      ],
+      "length": 11,
+      "time": 10.0
+    },
+    "('STATION_F', 'STATION_B')": {
+      "from": "STATION_F",
+      "to": "STATION_B",
+      "path": [
+        [
+          4,
+          7
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          4
+        ],
+        [
+          4,
+          3
+        ],
+        [
+          4,
+          2
+        ],
+        [
+          4,
+          1
+        ],
+        [
+          4,
+          0
+        ]
+      ],
+      "length": 9,
+      "time": 8.0
+    },
+    "('STATION_F', 'STATION_C')": {
+      "from": "STATION_F",
+      "to": "STATION_C",
+      "path": [
+        [
+          4,
+          7
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          4
+        ],
+        [
+          4,
+          3
+        ],
+        [
+          4,
+          2
+        ],
+        [
+          4,
+          1
+        ],
+        [
+          5,
+          1
+        ],
+        [
+          6,
+          1
+        ],
+        [
+          6,
+          0
+        ]
+      ],
+      "length": 11,
+      "time": 10.0
+    },
+    "('STATION_F', 'STATION_D')": {
+      "from": "STATION_F",
+      "to": "STATION_D",
+      "path": [
+        [
+          4,
+          7
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          4
+        ],
+        [
+          4,
+          3
+        ],
+        [
+          4,
+          2
+        ],
+        [
+          4,
+          1
+        ],
+        [
+          5,
+          1
+        ],
+        [
+          6,
+          1
+        ],
+        [
+          7,
+          1
+        ],
+        [
+          8,
+          1
+        ],
+        [
+          8,
+          0
+        ]
+      ],
+      "length": 13,
+      "time": 12.0
+    },
+    "('STATION_F', 'STATION_E')": {
+      "from": "STATION_F",
+      "to": "STATION_E",
+      "path": [
+        [
+          4,
+          7
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          6,
+          7
+        ]
+      ],
+      "length": 6,
+      "time": 5.0
+    },
+    "('STATION_F', 'STATION_G')": {
+      "from": "STATION_F",
+      "to": "STATION_G",
+      "path": [
+        [
+          4,
+          7
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          3,
+          6
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          2,
+          7
+        ]
+      ],
+      "length": 6,
+      "time": 5.0
+    },
+    "('STATION_G', 'STATION_A')": {
+      "from": "STATION_G",
+      "to": "STATION_A",
+      "path": [
+        [
+          2,
+          7
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          2
         ],
         [
           2,
@@ -1073,789 +1997,17 @@
       "length": 9,
       "time": 8.0
     },
-    "('STATION_D', 'STATION_B')": {
-      "from": "STATION_D",
-      "to": "STATION_B",
-      "path": [
-        [
-          4,
-          0
-        ],
-        [
-          8,
-          1
-        ],
-        [
-          7,
-          1
-        ],
-        [
-          6,
-          1
-        ],
-        [
-          5,
-          1
-        ],
-        [
-          4,
-          1
-        ],
-        [
-          4,
-          0
-        ]
-      ],
-      "length": 7,
-      "time": 6.0
-    },
-    "('STATION_D', 'STATION_C')": {
-      "from": "STATION_D",
-      "to": "STATION_C",
-      "path": [
-        [
-          6,
-          0
-        ],
-        [
-          8,
-          1
-        ],
-        [
-          7,
-          1
-        ],
-        [
-          6,
-          1
-        ],
-        [
-          6,
-          0
-        ]
-      ],
-      "length": 5,
-      "time": 4.0
-    },
-    "('STATION_D', 'STATION_E')": {
-      "from": "STATION_D",
-      "to": "STATION_E",
-      "path": [
-        [
-          6,
-          7
-        ],
-        [
-          8,
-          1
-        ],
-        [
-          8,
-          2
-        ],
-        [
-          8,
-          3
-        ],
-        [
-          8,
-          4
-        ],
-        [
-          8,
-          5
-        ],
-        [
-          8,
-          6
-        ],
-        [
-          7,
-          6
-        ],
-        [
-          6,
-          6
-        ],
-        [
-          6,
-          7
-        ]
-      ],
-      "length": 10,
-      "time": 9.0
-    },
-    "('STATION_D', 'STATION_F')": {
-      "from": "STATION_D",
-      "to": "STATION_F",
-      "path": [
-        [
-          4,
-          7
-        ],
-        [
-          8,
-          1
-        ],
-        [
-          8,
-          2
-        ],
-        [
-          8,
-          3
-        ],
-        [
-          8,
-          4
-        ],
-        [
-          8,
-          5
-        ],
-        [
-          8,
-          6
-        ],
-        [
-          7,
-          6
-        ],
-        [
-          6,
-          6
-        ],
-        [
-          5,
-          6
-        ],
-        [
-          4,
-          6
-        ],
-        [
-          4,
-          7
-        ]
-      ],
-      "length": 12,
-      "time": 11.0
-    },
-    "('STATION_D', 'STATION_G')": {
-      "from": "STATION_D",
-      "to": "STATION_G",
-      "path": [
-        [
-          2,
-          7
-        ],
-        [
-          8,
-          1
-        ],
-        [
-          8,
-          2
-        ],
-        [
-          8,
-          3
-        ],
-        [
-          8,
-          4
-        ],
-        [
-          8,
-          5
-        ],
-        [
-          8,
-          6
-        ],
-        [
-          7,
-          6
-        ],
-        [
-          6,
-          6
-        ],
-        [
-          5,
-          6
-        ],
-        [
-          4,
-          6
-        ],
-        [
-          3,
-          6
-        ],
-        [
-          2,
-          6
-        ],
-        [
-          2,
-          7
-        ]
-      ],
-      "length": 14,
-      "time": 13.0
-    },
-    "('STATION_E', 'STATION_A')": {
-      "from": "STATION_E",
-      "to": "STATION_A",
-      "path": [
-        [
-          2,
-          0
-        ],
-        [
-          6,
-          6
-        ],
-        [
-          5,
-          6
-        ],
-        [
-          4,
-          6
-        ],
-        [
-          3,
-          6
-        ],
-        [
-          2,
-          6
-        ],
-        [
-          2,
-          5
-        ],
-        [
-          2,
-          4
-        ],
-        [
-          2,
-          3
-        ],
-        [
-          2,
-          2
-        ],
-        [
-          2,
-          1
-        ],
-        [
-          2,
-          0
-        ]
-      ],
-      "length": 12,
-      "time": 11.0
-    },
-    "('STATION_E', 'STATION_B')": {
-      "from": "STATION_E",
-      "to": "STATION_B",
-      "path": [
-        [
-          4,
-          0
-        ],
-        [
-          6,
-          6
-        ],
-        [
-          6,
-          5
-        ],
-        [
-          6,
-          4
-        ],
-        [
-          6,
-          3
-        ],
-        [
-          6,
-          2
-        ],
-        [
-          6,
-          1
-        ],
-        [
-          5,
-          1
-        ],
-        [
-          4,
-          1
-        ],
-        [
-          4,
-          0
-        ]
-      ],
-      "length": 10,
-      "time": 9.0
-    },
-    "('STATION_E', 'STATION_C')": {
-      "from": "STATION_E",
-      "to": "STATION_C",
-      "path": [
-        [
-          6,
-          0
-        ],
-        [
-          6,
-          6
-        ],
-        [
-          6,
-          5
-        ],
-        [
-          6,
-          4
-        ],
-        [
-          6,
-          3
-        ],
-        [
-          6,
-          2
-        ],
-        [
-          6,
-          1
-        ],
-        [
-          6,
-          0
-        ]
-      ],
-      "length": 8,
-      "time": 7.0
-    },
-    "('STATION_E', 'STATION_D')": {
-      "from": "STATION_E",
-      "to": "STATION_D",
-      "path": [
-        [
-          8,
-          0
-        ],
-        [
-          6,
-          6
-        ],
-        [
-          6,
-          5
-        ],
-        [
-          6,
-          4
-        ],
-        [
-          6,
-          3
-        ],
-        [
-          6,
-          2
-        ],
-        [
-          6,
-          1
-        ],
-        [
-          7,
-          1
-        ],
-        [
-          8,
-          1
-        ],
-        [
-          8,
-          0
-        ]
-      ],
-      "length": 10,
-      "time": 9.0
-    },
-    "('STATION_E', 'STATION_F')": {
-      "from": "STATION_E",
-      "to": "STATION_F",
-      "path": [
-        [
-          4,
-          7
-        ],
-        [
-          6,
-          6
-        ],
-        [
-          5,
-          6
-        ],
-        [
-          4,
-          6
-        ],
-        [
-          4,
-          7
-        ]
-      ],
-      "length": 5,
-      "time": 4.0
-    },
-    "('STATION_E', 'STATION_G')": {
-      "from": "STATION_E",
-      "to": "STATION_G",
-      "path": [
-        [
-          2,
-          7
-        ],
-        [
-          6,
-          6
-        ],
-        [
-          5,
-          6
-        ],
-        [
-          4,
-          6
-        ],
-        [
-          3,
-          6
-        ],
-        [
-          2,
-          6
-        ],
-        [
-          2,
-          7
-        ]
-      ],
-      "length": 7,
-      "time": 6.0
-    },
-    "('STATION_F', 'STATION_A')": {
-      "from": "STATION_F",
-      "to": "STATION_A",
-      "path": [
-        [
-          2,
-          0
-        ],
-        [
-          4,
-          6
-        ],
-        [
-          4,
-          5
-        ],
-        [
-          4,
-          4
-        ],
-        [
-          4,
-          3
-        ],
-        [
-          4,
-          2
-        ],
-        [
-          4,
-          1
-        ],
-        [
-          3,
-          1
-        ],
-        [
-          2,
-          1
-        ],
-        [
-          2,
-          0
-        ]
-      ],
-      "length": 10,
-      "time": 9.0
-    },
-    "('STATION_F', 'STATION_B')": {
-      "from": "STATION_F",
-      "to": "STATION_B",
-      "path": [
-        [
-          4,
-          0
-        ],
-        [
-          4,
-          6
-        ],
-        [
-          4,
-          5
-        ],
-        [
-          4,
-          4
-        ],
-        [
-          4,
-          3
-        ],
-        [
-          4,
-          2
-        ],
-        [
-          4,
-          1
-        ],
-        [
-          4,
-          0
-        ]
-      ],
-      "length": 8,
-      "time": 7.0
-    },
-    "('STATION_F', 'STATION_C')": {
-      "from": "STATION_F",
-      "to": "STATION_C",
-      "path": [
-        [
-          6,
-          0
-        ],
-        [
-          4,
-          6
-        ],
-        [
-          4,
-          5
-        ],
-        [
-          4,
-          4
-        ],
-        [
-          4,
-          3
-        ],
-        [
-          4,
-          2
-        ],
-        [
-          4,
-          1
-        ],
-        [
-          5,
-          1
-        ],
-        [
-          6,
-          1
-        ],
-        [
-          6,
-          0
-        ]
-      ],
-      "length": 10,
-      "time": 9.0
-    },
-    "('STATION_F', 'STATION_D')": {
-      "from": "STATION_F",
-      "to": "STATION_D",
-      "path": [
-        [
-          8,
-          0
-        ],
-        [
-          4,
-          6
-        ],
-        [
-          4,
-          5
-        ],
-        [
-          4,
-          4
-        ],
-        [
-          4,
-          3
-        ],
-        [
-          4,
-          2
-        ],
-        [
-          4,
-          1
-        ],
-        [
-          5,
-          1
-        ],
-        [
-          6,
-          1
-        ],
-        [
-          7,
-          1
-        ],
-        [
-          8,
-          1
-        ],
-        [
-          8,
-          0
-        ]
-      ],
-      "length": 12,
-      "time": 11.0
-    },
-    "('STATION_F', 'STATION_E')": {
-      "from": "STATION_F",
-      "to": "STATION_E",
-      "path": [
-        [
-          6,
-          7
-        ],
-        [
-          4,
-          6
-        ],
-        [
-          5,
-          6
-        ],
-        [
-          6,
-          6
-        ],
-        [
-          6,
-          7
-        ]
-      ],
-      "length": 5,
-      "time": 4.0
-    },
-    "('STATION_F', 'STATION_G')": {
-      "from": "STATION_F",
-      "to": "STATION_G",
-      "path": [
-        [
-          2,
-          7
-        ],
-        [
-          4,
-          6
-        ],
-        [
-          3,
-          6
-        ],
-        [
-          2,
-          6
-        ],
-        [
-          2,
-          7
-        ]
-      ],
-      "length": 5,
-      "time": 4.0
-    },
-    "('STATION_G', 'STATION_A')": {
-      "from": "STATION_G",
-      "to": "STATION_A",
-      "path": [
-        [
-          2,
-          0
-        ],
-        [
-          2,
-          6
-        ],
-        [
-          2,
-          5
-        ],
-        [
-          2,
-          4
-        ],
-        [
-          2,
-          3
-        ],
-        [
-          2,
-          2
-        ],
-        [
-          2,
-          1
-        ],
-        [
-          2,
-          0
-        ]
-      ],
-      "length": 8,
-      "time": 7.0
-    },
     "('STATION_G', 'STATION_B')": {
       "from": "STATION_G",
       "to": "STATION_B",
       "path": [
         [
-          4,
-          0
+          2,
+          7
+        ],
+        [
+          2,
+          6
         ],
         [
           2,
@@ -1894,16 +2046,20 @@
           0
         ]
       ],
-      "length": 10,
-      "time": 9.0
+      "length": 11,
+      "time": 10.0
     },
     "('STATION_G', 'STATION_C')": {
       "from": "STATION_G",
       "to": "STATION_C",
       "path": [
         [
-          6,
-          0
+          2,
+          7
+        ],
+        [
+          2,
+          6
         ],
         [
           2,
@@ -1950,16 +2106,20 @@
           0
         ]
       ],
-      "length": 12,
-      "time": 11.0
+      "length": 13,
+      "time": 12.0
     },
     "('STATION_G', 'STATION_D')": {
       "from": "STATION_G",
       "to": "STATION_D",
       "path": [
         [
-          8,
-          0
+          2,
+          7
+        ],
+        [
+          2,
+          6
         ],
         [
           2,
@@ -2014,16 +2174,20 @@
           0
         ]
       ],
-      "length": 14,
-      "time": 13.0
+      "length": 15,
+      "time": 14.0
     },
     "('STATION_G', 'STATION_E')": {
       "from": "STATION_G",
       "to": "STATION_E",
       "path": [
         [
-          6,
+          2,
           7
+        ],
+        [
+          2,
+          6
         ],
         [
           2,
@@ -2050,16 +2214,20 @@
           7
         ]
       ],
-      "length": 7,
-      "time": 6.0
+      "length": 8,
+      "time": 7.0
     },
     "('STATION_G', 'STATION_F')": {
       "from": "STATION_G",
       "to": "STATION_F",
       "path": [
         [
-          4,
+          2,
           7
+        ],
+        [
+          2,
+          6
         ],
         [
           2,
@@ -2078,8 +2246,8 @@
           7
         ]
       ],
-      "length": 5,
-      "time": 4.0
+      "length": 6,
+      "time": 5.0
     }
   }
 }

@@ -13,7 +13,7 @@ class DiffDriveController(Node):
     and the Gazebo Harmonic (gz-sim) simulation via ros_gz_bridge.
     
     Topic Flow:
-    - Subscribes to /cmd_vel (from navigation/planner) TODO
+    - Subscribes to /cmd_vel (from navigation/planner)
     - Publishes to /model/vehicle/cmd_vel (to Gazebo via bridge)
     - Subscribes to /model/vehicle/odometry (from Gazebo via bridge)
     - Publishes to /robot/odom (for other nodes)
@@ -27,7 +27,7 @@ class DiffDriveController(Node):
             namespace='',
             parameters=[
                 ('max_linear_velocity', 2.0),       # m/s
-                ('max_angular_velocity', 1.5),      # rad/s
+                ('max_angular_velocity', 10.0),      # rad/s
                 ('cmd_vel_timeout', 0.5),           # seconds
                 ('publish_rate', 50.0),             # Hz
             ]
@@ -45,8 +45,8 @@ class DiffDriveController(Node):
         self.last_cmd_time = self.get_clock().now()
         
         # Current pose (from Gazebo odometry)
-        self.current_x = 0.0
-        self.current_y = 0.0
+        self.current_x = 1.0
+        self.current_y = 13.0
         self.current_theta = 0.0
         self.current_linear_velocity = 0.0
         self.current_angular_velocity = 0.0
@@ -54,19 +54,19 @@ class DiffDriveController(Node):
         # Flag if receiving commands
         self.receiving_commands = False
         
-        # Subscribers
-        # High-level commands from navigation/planner
-        # self.cmd_vel_sub = self.create_subscription(
-        #     Twist,
-        #     '/cmd_vel',
-        #     self.cmd_vel_callback,
-        #     10
-        # )
+        #Subscribers
+        #Twist commands from navigation
+        self.cmd_vel_sub = self.create_subscription(
+            Twist,
+            '/cmd_vel',
+            self.cmd_vel_callback,
+            10
+        )
         
         # Odometry from Gazebo (via ros_gz_bridge)
         self.odom_sub = self.create_subscription(
             Odometry,
-            '/model/vehicle/odometry',
+            '/model/warehouse_robot/odometry',
             self.odom_callback,
             10
         )
@@ -75,7 +75,7 @@ class DiffDriveController(Node):
         # Commands to Gazebo (via ros_gz_bridge)
         self.gz_cmd_vel_pub = self.create_publisher(
             Twist,
-            '/model/vehicle/cmd_vel',
+            '/model/warehouse_robot/cmd_vel',
             10
         )
         
@@ -197,9 +197,7 @@ class DiffDriveController(Node):
         self.is_moving_pub.publish(is_moving_msg)
     
     def quaternion_to_yaw(self, x, y, z, w):
-        """
-        Convert quaternion to yaw angle (rotation around z-axis).
-        """
+
         siny_cosp = 2.0 * (w * z + x * y)
         cosy_cosp = 1.0 - 2.0 * (y * y + z * z)
         yaw = math.atan2(siny_cosp, cosy_cosp)
