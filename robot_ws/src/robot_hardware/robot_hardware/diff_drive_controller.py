@@ -108,10 +108,6 @@ class DiffDriveController(Node):
         self.get_logger().info('Publishing to: /robot/odom (system-wide)')
     
     def cmd_vel_callback(self, msg: Twist):
-        """
-        Callback for incoming velocity commands.
-        Clamps velocities to maximum values and forwards to Gazebo.
-        """
         # Update last command time
         self.last_cmd_time = self.get_clock().now()
         self.receiving_commands = True
@@ -143,10 +139,6 @@ class DiffDriveController(Node):
             )
     
     def odom_callback(self, msg: Odometry):
-        """
-        Callback for odometry from Gazebo (via ros_gz_bridge).
-        Stores current pose and velocity, then republishes.
-        """
         # Extract position
         self.current_x = msg.pose.pose.position.x
         self.current_y = msg.pose.pose.position.y
@@ -167,10 +159,6 @@ class DiffDriveController(Node):
         self.odom_pub.publish(msg)
     
     def timer_callback(self):
-        """
-        Periodic callback for safety checks and status publishing.
-        Stops robot if no commands received within timeout period.
-        """
         current_time = self.get_clock().now()
         time_since_cmd = (current_time - self.last_cmd_time).nanoseconds / 1e9
         
