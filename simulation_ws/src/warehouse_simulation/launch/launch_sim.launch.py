@@ -30,15 +30,15 @@ def generate_launch_description():
     with open(urdf_path, 'r') as infp:
         robot_desc = infp.read()
     
-    # node_robot_state_publisher = Node(
-    #     package='robot_state_publisher',
-    #     executable='robot_state_publisher',
-    #     output='screen',
-    #     parameters=[{
-    #         'robot_description': robot_desc,
-    #         'use_sim_time': True
-    #     }]
-    # )
+    node_robot_state_publisher = Node(
+        package='robot_state_publisher',
+        executable='robot_state_publisher',
+        output='screen',
+        parameters=[{
+            'robot_description': robot_desc,
+            'use_sim_time': True
+        }]
+    )
 
     models_path = PathJoinSubstitution([
         pkg_simulation,
@@ -73,6 +73,16 @@ def generate_launch_description():
         ]
     )
 
+    robot_navi = Node(
+        package='robot_navi',
+        executable='robot_navi',
+        name='robot_navi',
+        output='screen',
+        parameters=[
+            {'use_sim_time': use_sim_time}
+        ]
+    )
+
     IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(station_pkg, 'launch', 'station.launch.py')
@@ -97,11 +107,12 @@ def generate_launch_description():
         package='ros_gz_bridge',
         executable='parameter_bridge',
         arguments=[
-            '/cmd_vel@geometry_msgs/msg/Twist@gz.msgs.Twist',
-            '/odom@nav_msgs/msg/Odometry@gz.msgs.Odometry',
-            '/tf@tf2_msgs/msg/TFMessage@gz.msgs.Pose_V',
-            '/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock' # [ sorgt für Richtung GZ -> ROS
-        ],
+        '/cmd_vel@geometry_msgs/msg/Twist@gz.msgs.Twist',
+        '/model/warehouse_robot/odometry@nav_msgs/msg/Odometry@gz.msgs.Odometry',
+        '/model/warehouse_robot/cmd_vel@geometry_msgs/msg/Twist]gz.msgs.Twist',
+        '/tf@tf2_msgs/msg/TFMessage@gz.msgs.Pose_V',
+        '/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock'
+    ],
         output='screen'
     )
 
@@ -113,8 +124,11 @@ def generate_launch_description():
         ),
         set_gazebo_model_path,
         gazebo,
+        node_robot_state_publisher,
         spawn_robot,
         bridge,
         diff_drive_controller,
-        battery_controller
+        battery_controller,
+        robot_navi,
+
     ])
