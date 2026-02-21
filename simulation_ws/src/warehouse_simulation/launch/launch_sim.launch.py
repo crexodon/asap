@@ -101,9 +101,9 @@ def generate_launch_description():
         output='screen',
         parameters=[
             {'use_sim_time': use_sim_time},
-            #{'model_path': os.path.join(planner_pkg, 'models', 'model*.zip')},
-            #{'max_episode_time_s': 2000.0},
-            #{'wait_cancel_immediately': True}
+            {'model_path': ('share/' + planner_pkg + '/models', ['models/model.zip'])},
+            {'max_episode_time_s': 2000.0},
+            {'wait_cancel_immediately': True}
         ]
     )
 
