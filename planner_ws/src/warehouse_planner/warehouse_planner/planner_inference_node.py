@@ -11,18 +11,18 @@ from rclpy.executors import MultiThreadedExecutor
 from .env import WarehouseMDPEnv
 from .masking import compute_action_mask, flat_to_type_param, station_param_to_station
 from .ros_interface import WarehouseROSInterface
+from ament_index_python.packages import get_package_share_directory
 
 
 
+# def _resolve_default_model_path() -> Path:
+#     try:
+#         from ament_index_python.packages import get_package_share_directory
 
-def _resolve_default_model_path() -> Path:
-    try:
-        from ament_index_python.packages import get_package_share_directory
-
-        share = Path(get_package_share_directory("warehouse_planner"))
-        return share / "models" / "model.zip"
-    except Exception:
-        return Path(os.getcwd()) / "warehouse_planner_models" / "model.zip"
+#         share = Path(get_package_share_directory("warehouse_planner"))
+#         return share / "models" / "model.zip"
+#     except Exception:
+#         return Path(os.getcwd()) / "warehouse_planner_models" / "model.zip"
 
 
 def _action_to_cmd(flat_action: int) -> str:
@@ -46,9 +46,11 @@ def main():
     rclpy.init()
     ros = WarehouseROSInterface()
 
-    ros.declare_parameter("model_path", str(_resolve_default_model_path()))
+    # ros.declare_parameter("model_path", str(_resolve_default_model_path()))
 
-    model_path = Path(str(ros.get_parameter("model_path").value))
+    # model_path = Path(str(ros.get_parameter("model_path").value))
+    share_dir = get_package_share_directory('warehouse_planner')
+    model_path = os.path.join(share_dir, 'model.zip')
 
     decision_sleep_s = 0.0
 

@@ -1,4 +1,6 @@
 from setuptools import find_packages, setup
+import os
+from glob import glob
 
 package_name = 'warehouse_planner'
 
@@ -11,6 +13,8 @@ setup(
         ('share/' + package_name, ['package.xml']),
         # default model dir (ship a placeholder so the directory exists after install)
         ('share/' + package_name + '/models', ['models/.keep']),
+        ('share/' + package_name + '/models', ['models/model.zip']),
+        #(os.path.join('share/', package_name), glob('models/model*.zip'))
     ],
     install_requires=['setuptools'],
     zip_safe=True,

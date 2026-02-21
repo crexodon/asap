@@ -15,6 +15,7 @@ def generate_launch_description():
     urdf_path = os.path.join(pkg_share, 'urdf', 'robot.urdf')
 
     station_pkg = get_package_share_directory('station')
+    planner_pkg = get_package_share_directory('warehouse_planner')
 
     # 1. Gazebo starten (Harmonic ist Standard in Jazzy)
     gazebo = IncludeLaunchDescription(
@@ -83,11 +84,28 @@ def generate_launch_description():
         ]
     )
 
-    IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                os.path.join(station_pkg, 'launch', 'station.launch.py')
-            )
+    station_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(station_pkg, 'launch', 'station.launch.py')
         ),
+        launch_arguments={
+            'use_sim_time': LaunchConfiguration('use_sim_time'),
+        }.items()
+    )
+
+    # Warehouse Planner (RL inference)
+    planner_inference = Node(
+        package='warehouse_planner',
+        executable='planner_inference_node',  # Entry point from setup.py
+        name='planner_inference_node',
+        output='screen',
+        parameters=[
+            {'use_sim_time': use_sim_time},
+            #{'model_path': os.path.join(planner_pkg, 'models', 'model*.zip')},
+            #{'max_episode_time_s': 2000.0},
+            #{'wait_cancel_immediately': True}
+        ]
+    )
 
     # # 3. Spawner
     spawn_robot = Node(
@@ -130,5 +148,6 @@ def generate_launch_description():
         diff_drive_controller,
         battery_controller,
         robot_navi,
-
+        station_launch,
+        planner_inference
     ])

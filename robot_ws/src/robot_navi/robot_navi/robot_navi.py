@@ -93,6 +93,8 @@ class RobotNavi(Node):
             "ON_TRANSIT": "START",
             "S": "START"
         }
+
+        self.pick_drop_dt = 0.1  # Time for pick/drop operations in seconds
         
         # Control parameters
         self.nav_linear_speed = 2.0  # m/s
@@ -470,6 +472,76 @@ class RobotNavi(Node):
     #         res.result = "FAIL incomplete"
     #         res.dt = dt
     #         return res
+
+    def _wait_for_service(self, client, name: str, timeout_s: float = 5.0) -> bool:
+        t0 = time.time()
+        while not client.service_is_ready():
+            if time.time() - t0 > timeout_s:
+                self.get_logger().error(f"Service not ready: {name}")
+                return False
+            time.sleep(0.05)
+        return True
+
+    def _wait_future(self, fut, timeout_s: float, name: str) -> bool:
+        t0 = time.time()
+        while rclpy.ok() and not fut.done():
+            if time.time() - t0 > timeout_s:
+                self.get_logger().error(f"Timeout waiting for {name}")
+                return False
+            time.sleep(0.01)
+        return fut.done()
+
+    def _call_enqueue(self, station_id: str, package_idx: int) -> Enqueue.Response:
+        cli = self.cli_enqueue[station_id]
+        if not self._wait_for_service(cli, f"/robot_action/{station_id}/enqueue"):
+            raise RuntimeError("enqueue service not ready")
+        req = Enqueue.Request()
+        req.package_idx = int(package_idx)
+        fut = cli.call_async(req)
+        if not self._wait_future(fut, 5.0, f"enqueue({station_id})"):
+            raise RuntimeError("enqueue service timeout")
+        return fut.result()
+
+    def _call_dequeue(self, station_id: str, package_idx: int) -> Dequeue.Response:
+        cli = self.cli_dequeue[station_id]
+        if not self._wait_for_service(cli, f"/robot_action/{station_id}/dequeue"):
+            raise RuntimeError("dequeue service not ready")
+        req = Dequeue.Request()
+        req.package_idx = int(package_idx)
+        fut = cli.call_async(req)
+        if not self._wait_future(fut, 5.0, f"dequeue({station_id})"):
+            raise RuntimeError("dequeue service timeout")
+        return fut.result()
+
+    def _do_pick_a(self, package_idx: int) -> Tuple[bool, str, int, float]:
+        if not self.ac_pick_a.wait_for_server(timeout_sec=5.0):
+            return False, "FAIL no pick_a server", -1, 0.0
+
+        goal = Pick.Goal()
+        goal.package_idx = int(package_idx)
+
+        t0 = time.time()
+
+        goal_fut = self.ac_pick_a.send_goal_async(goal)
+        if not self._wait_future(goal_fut, 5.0, "pick_a send_goal"):
+            return False, "FAIL send_goal timeout", -1, 0.0
+        
+        goal_handle = goal_fut.result()
+        if goal_handle is None or not goal_handle.accepted:
+            return False, "FAIL not accepted", -1, 0.0
+
+        res_fut = goal_handle.get_result_async()
+        if not self._wait_future(res_fut, 60.0, "pick_a result"):
+            return False, "FAIL result timeout", -1, 0.0
+
+        res = res_fut.result()
+        status_ok = (res.status == GoalStatus.STATUS_SUCCEEDED)
+        result_msg = str(res.result.result).strip()
+        picked = int(res.result.package_idx)
+
+        dt = float(time.time() - t0)
+
+        return status_ok, result_msg, picked, dt
     
     def execute_cmd(self, goal_handle):
         cmd = str(goal_handle.request.cmd).strip()
@@ -533,26 +605,18 @@ class RobotNavi(Node):
         if verb == "PICK":
             if len(parts) != 2:
                 goal_handle.abort()
-                res = PlannerCmd.Result()
-                res.result = "FAIL"
-                res.dt = 0.0
-                return res
+                return PlannerCmd.Result(result="FAIL no package_idx", dt=0.0)
+            
             try:
                 pkg = int(parts[1])
             except ValueError:
                 goal_handle.abort()
-                res = PlannerCmd.Result()
-                res.result = "FAIL"
-                res.dt = 0.0
-                return res
+                return PlannerCmd.Result(result="FAIL package_idx not integer", dt=0.0)
 
             station = self.robot_location
             if station not in STATION_COORDS:
                 goal_handle.abort()
-                res = PlannerCmd.Result()
-                res.result = "FAIL"
-                res.dt = 0.0
-                return res
+                return PlannerCmd.Result(result="FAIL not at valid station", dt=0.0)
 
             self.robot_mode = "BUSY"
             self.publish_state()
@@ -566,41 +630,34 @@ class RobotNavi(Node):
                 self.get_logger().error(f"PICK failed: {e}")
                 ok = False
 
-            dt = float(self.pick_drop_dt)
+            dt = 0.1  # Minimal time for pick operation
 
             self.robot_mode = "IDLE"
             self.publish_state()
 
-            (goal_handle.succeed() if ok else goal_handle.abort())
-            res = PlannerCmd.Result()
-            res.result = "OK" if ok else "FAIL"
-            res.dt = dt
-            return res
+            if ok:
+                goal_handle.succeed()
+                return PlannerCmd.Result(result="OK", dt=dt)
+            else:
+                goal_handle.abort()
+                return PlannerCmd.Result(result="FAIL", dt=dt)
 
         # DROP k
         if verb == "DROP":
             if len(parts) != 2:
                 goal_handle.abort()
-                res = PlannerCmd.Result()
-                res.result = "FAIL no package_idx given"
-                res.dt = 0.0
-                return res
+                return PlannerCmd.Result(result="FAIL no package_idx", dt=0.0)
+            
             try:
                 pkg = int(parts[1])
             except ValueError:
                 goal_handle.abort()
-                res = PlannerCmd.Result()
-                res.result = "FAIL package_idx no integer"
-                res.dt = 0.0
-                return res
+                return PlannerCmd.Result(result="FAIL package_idx not integer", dt=0.0)
 
             station = self.robot_location
             if station not in STATION_COORDS:
                 goal_handle.abort()
-                res = PlannerCmd.Result()
-                res.result = "FAIL location not valid"
-                res.dt = 0.0
-                return res
+                return PlannerCmd.Result(result="FAIL not at valid station", dt=0.0)
 
             self.robot_mode = "BUSY"
             self.publish_state()
@@ -614,53 +671,50 @@ class RobotNavi(Node):
                 self.get_logger().error(f"DROP failed: {e}")
                 ok = False
 
-            dt = float(self.pick_drop_dt)
+            dt = 0.1  # Minimal time for drop operation
 
             self.robot_mode = "IDLE"
             self.publish_state()
 
-            (goal_handle.succeed() if ok else goal_handle.abort())
-            res = PlannerCmd.Result()
-            res.result = "OK" if ok else "FAIL"
-            res.dt = dt
-            return res
+            if ok:
+                goal_handle.succeed()
+                return PlannerCmd.Result(result="OK", dt=dt)
+            else:
+                goal_handle.abort()
+                return PlannerCmd.Result(result="FAIL", dt=dt)
 
         # PICK_A k
         if verb == "PICK_A":
             if len(parts) != 2:
                 goal_handle.abort()
-                res = PlannerCmd.Result()
-                res.result = "FAIL no package_idx"
-                res.dt = 0.0
-                return res
+                return PlannerCmd.Result(result="FAIL no package_idx", dt=0.0)
+            
             try:
                 pkg = int(parts[1])
             except ValueError:
                 goal_handle.abort()
-                res = PlannerCmd.Result()
-                res.result = "FAIL package_idx not readable"
-                res.dt = 0.0
-                return res
+                return PlannerCmd.Result(result="FAIL package_idx not integer", dt=0.0)
 
             self.robot_mode = "BUSY"
             self.publish_state()
 
             status_ok, result_str, picked_pkg, dt = self._do_pick_a(pkg)
-            ok = status_ok
-            if ok:
+            
+            if status_ok:
                 self.carrying_idx = int(picked_pkg)
-
-            self.robot_mode = "IDLE"
-            self.publish_state()
-
-            (goal_handle.succeed() if ok else goal_handle.abort())
-            res = PlannerCmd.Result()
-            res.result = "OK" if ok else "FAIL picking action failed"
-            res.dt = float(dt)
-
-            self.get_logger().info(f"PICK_A raw result_str={result_str} picked_pkg={picked_pkg} dt={dt}")
-
-            return res
+                self.robot_mode = "IDLE"
+                self.publish_state()
+                
+                goal_handle.succeed()
+                self.get_logger().info(f"PICK_A success: picked package {picked_pkg}")
+                return PlannerCmd.Result(result="OK", dt=float(dt))
+            else:
+                self.robot_mode = "IDLE"
+                self.publish_state()
+                
+                goal_handle.abort()
+                self.get_logger().error(f"PICK_A failed: {result_str}")
+                return PlannerCmd.Result(result="FAIL", dt=float(dt))
 
         # CHARGE
         if verb == "CHARGE":
