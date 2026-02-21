@@ -7,7 +7,7 @@ from interfaces.action import Pick, Charge
 from interfaces.msg import WorldEvent, RobotState
 import time
 from rclpy.callback_groups import ReentrantCallbackGroup, MutuallyExclusiveCallbackGroup
-from std_srvs.srv import SetBool
+from rclpy.executors import MultiThreadedExecutor
 
 
 STATIONS = ["A","B","C","D","E","F","G"]
@@ -57,7 +57,6 @@ class StationNode(Node):
         )
 
         # Service for Job spawn
-        # Spawn service (only Station A) - NO robot-present gate
         self.srv_spawn = None
         if self.station_id == "A":
             self.srv_spawn = self.create_service(
@@ -124,17 +123,17 @@ class StationNode(Node):
         self.robot_location = msg.robot_location
     
     def on_spawn(self, req: Enqueue.Request, res: Enqueue.Response):
-        # NO robot_present check!
+        # no robot_present check
         pkg = int(req.package_idx)
 
-        # In your concept: spawned job should be immediately available for pickup at A
+        # spawned job should be immediately available for pickup at A
         self.output_queue.append(pkg)
 
         res.result = "ACCEPTED"
         res.position = len(self.output_queue) - 1
         res.actual_package_idx = pkg
 
-        # Update SoT: package is at A and READY for pickup
+        # Update JobHandler
         self.set_pkg(pkg,
                     ["current_location", "lifecycle_state", "availability", "next_location"],
                     ["A", "READY", "true", "B"])
@@ -228,7 +227,7 @@ class StationNode(Node):
 
         # package is now at station input
         if self.station_id == "E":
-            # DO NOT overwrite lifecycle_state, because FAILED must remain FAILED for bypass logic
+
             self.set_pkg(pkg, ["current_location", "availability"], [self.station_id, "false"])
         else:
             self.set_pkg(pkg, ["current_location","lifecycle_state","availability"], [self.station_id, "WAITING", "false"])
@@ -344,7 +343,7 @@ class StationNode(Node):
         while True:
             attempt += 1
 
-            # simulate duration (hidden)
+            # duration
             duration = 1.0 + self.rng.random() * 1.0  # U(1.0,2.0)
             t0 = time.time()
 
@@ -367,9 +366,8 @@ class StationNode(Node):
             success = (self.rng.random() < 0.95)
             if success:
                 break
-            # else: failed -> repeat same package again (no state change necessary)
+            # else: failed, repeat same package again
 
-        # commit: remove from output_queue
         if pkg in self.output_queue:
             self.output_queue.remove(pkg)
 
@@ -414,10 +412,15 @@ class StationNode(Node):
             result.dt = 0.0
             return result
 
-        rate = self.create_rate(10)
-
-        try:
-            while self.current_battery < target:
+        # Battery model
+        current_battery_status = float(goal_handle.request.current_battery_status)
+        rate = 10 # 10 per second
+        max_battery_status = 100
+        dt = 1 # feedback in 1 s steps
+        charge_time = 0
+        while current_battery_status < max_battery_status:
+            t0 = time.time()
+            while (time.time()- t0) < dt:
                 if not self.robot_present():
                     await self.set_robot_charging(False)
                     goal_handle.abort()
@@ -427,11 +430,11 @@ class StationNode(Node):
                     result.dt = (self.get_clock().now() - start_time).nanoseconds / 1e9
                     self.emit_event("ACTION_RESULT")
                     return result
-
-                fb = Charge.Feedback()
-                fb.battery = self.current_battery
-                goal_handle.publish_feedback(fb)
-                rate.sleep()
+            charge_time += dt
+            current_battery_status += rate/dt
+            fb = Charge.Feedback()
+            fb.battery = float(current_battery_status)
+            goal_handle.publish_feedback(fb)
 
             # Disable charging
             await self.set_robot_charging(False)
@@ -497,13 +500,12 @@ class StationNode(Node):
             if self.station_id == "E":
                 lifecycle = self.get_pkg_lifecycle(self.processing_idx)
                 if lifecycle == "FAILED":
-                    # bypass: do not process, directly into failed output queue
                     pkg = self.processing_idx
                     self.processing_idx = -1
                     self.processing_state = "IDLE"
 
                     self.output_failed_queue.append(pkg)
-                    # terminal: keep FAILED and send to FINISH
+                    # keep FAILED and send to FINISH
                     self.set_pkg(pkg, ["next_location", "availability"], ["FINISH", "false"])
 
                     self.emit_event("PUT_FAILED_TO_STORE", package_idx=pkg)
@@ -538,11 +540,11 @@ class StationNode(Node):
         if self.station_id == "B":
             success = (self.rng.random() < 0.80) # Success Prob 0.8
         elif self.station_id == "C":
-            success = (self.rng.random() < 0.80) # Success Prob 0.95
+            success = (self.rng.random() < 0.95) # Success Prob 0.95
         elif self.station_id == "D":
-            success = (self.rng.random() < 0.80) # Success Prob 0.85
+            success = (self.rng.random() < 0.85) # Success Prob 0.85
         elif self.station_id == "E":
-            success = (self.rng.random() < 0.80) # Success Prob 0.85
+            success = (self.rng.random() < 0.85) # Success Prob 0.85
         elif self.station_id == "G":
             success = True # Success Prob 1.0
 
@@ -553,14 +555,12 @@ class StationNode(Node):
             self.set_pkg(pkg, ["next_location","lifecycle_state","availability"], [next_loc, "READY", "true"])
 
         elif self.station_id == "C":
-            # Station C does NOT decide next_location.
-            # It only finishes processing and makes the package ready in output.
+            # Station C does NOT decide next_location, JobHandler process automaically
             if success:
                 self.output_queue.append(pkg)
-                # Do NOT set next_location here!
                 self.set_pkg(pkg, ["lifecycle_state", "availability"], ["READY", "true"])
             else:
-                # repeat: put back to input
+                # repeat
                 self.input_queue.append(pkg)
                 self.set_pkg(pkg, ["lifecycle_state", "availability"], ["WAITING", "false"])
 
@@ -594,9 +594,6 @@ def main():
     rclpy.init()
     node = StationNode()
 
-    # Allow concurrent processing so service-client responses can be handled
-    # while we are inside another callback (e.g., on_spawn/processing_step).
-    from rclpy.executors import MultiThreadedExecutor
     executor = MultiThreadedExecutor(num_threads=4)
     executor.add_node(node)
 

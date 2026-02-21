@@ -3,15 +3,16 @@ from __future__ import annotations
 import os
 import time
 from pathlib import Path
+import threading
 
-import numpy as np
 import rclpy
 from rclpy.executors import MultiThreadedExecutor
 
-from .constants import FLAT_ACTIONS_N
 from .env import WarehouseMDPEnv
 from .masking import compute_action_mask, flat_to_type_param, station_param_to_station
 from .ros_interface import WarehouseROSInterface
+
+
 
 
 def _resolve_default_model_path() -> Path:
@@ -46,10 +47,10 @@ def main():
     ros = WarehouseROSInterface()
 
     ros.declare_parameter("model_path", str(_resolve_default_model_path()))
-    ros.declare_parameter("decision_sleep_s", 0.05)
 
     model_path = Path(str(ros.get_parameter("model_path").value))
-    decision_sleep_s = float(ros.get_parameter("decision_sleep_s").value)
+
+    decision_sleep_s = 0.0
 
     try:
         from sb3_contrib import MaskablePPO
@@ -59,26 +60,24 @@ def main():
         )
         raise
 
-    if not model_path.exists():
-        ros.get_logger().error(f"Model file not found: {model_path}")
-        raise FileNotFoundError(str(model_path))
-
     env = WarehouseMDPEnv(ros)
 
     ros.get_logger().info(f"Loading model: {model_path}")
-    model = MaskablePPO.load(str(model_path))
+    model = MaskablePPO.load(str(model_path), env=env)
 
     executor = MultiThreadedExecutor(num_threads=4)
     executor.add_node(ros)
-
-    # Spin in background so callbacks keep state fresh
-    import threading
 
     spin_thread = threading.Thread(target=executor.spin, daemon=True)
     spin_thread.start()
 
     # Initial obs
     obs, _ = env.reset()
+
+    total_reward = 0.0
+    total_steps = 0
+    start_wall_time = time.monotonic()
+
 
     try:
         while rclpy.ok():
@@ -93,13 +92,35 @@ def main():
 
             # Execute a single env step (will block until done / wait interrupt)
             obs, reward, terminated, truncated, info = env.step(int(action))
+
+
+            total_reward += reward
+            total_steps += 1
+            dt = info.get('dt', 0.0)  
+
             ros.get_logger().info(
                 f"Step finished: reward={reward:.3f} dt={info.get('dt', 0.0):.3f} terminated={terminated} truncated={truncated}"
             )
 
             if terminated or truncated:
-                ros.get_logger().info("Episode ended -> resetting")
-                obs, _ = env.reset()
+                end_wall_time = time.monotonic()
+                wall_time_duration = end_wall_time - start_wall_time
+                sim_time_duration = ros.episode_elapsed_s()
+                
+                status = "SUCCESSFUL" if terminated and not info.get('battery_depleted') else "CANCELED"
+                
+                print("\n" + "="*40)
+                print(f"      EPISODE-SUMMARY")
+                print("="*40)
+                print(f"Status:           {status}")
+                print(f"Gesamt-Reward:    {total_reward:.2f}")
+                print(f"Schritte:         {total_steps}")
+                print(f"Simulationszeit:  {sim_time_duration:.2f} s")
+                print(f"Echtzeit:         {wall_time_duration:.2f} s")
+                print("="*40 + "\n")
+                
+                ros.get_logger().info(f"Episode finished. Reward: {total_reward:.2f}, Time: {sim_time_duration:.2f}s")
+                break
 
             time.sleep(decision_sleep_s)
 

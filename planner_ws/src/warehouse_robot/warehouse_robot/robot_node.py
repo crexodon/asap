@@ -2,6 +2,7 @@ import math
 import time
 import random
 from typing import Dict, Tuple
+import json
 
 import rclpy
 from rclpy.node import Node
@@ -14,7 +15,9 @@ from interfaces.msg import RobotState, WorldEvent
 from interfaces.srv import Enqueue, Dequeue, ResetEpisode
 from interfaces.action import Pick, Charge, PlannerCmd
 
-from action_msgs.msg import GoalStatus
+from action_msgs.msg import GoalStatus 
+from ament_index_python.packages import get_package_share_directory
+import os
 
 
 
@@ -60,10 +63,12 @@ class WarehouseRobotNode(Node):
 
         self.rng = random.Random(int(self.get_parameter("seed").value))
 
-        self.move_speed = float(self.get_parameter("move_speed_mps").value)
-        self.move_factor = float(self.get_parameter("move_factor").value)
-        self.move_rand_min = float(self.get_parameter("move_rand_min").value)
-        self.move_rand_max = float(self.get_parameter("move_rand_max").value)
+        pkg_share = get_package_share_directory("warehouse_robot")
+        json_path = os.path.join(pkg_share, "grid_path.json")
+
+        with open(json_path, "r") as f:
+            self.move_to_data = json.load(f)
+            
         self.battery_drain_per_s = float(self.get_parameter("battery_drain_per_s").value)
         self.pick_drop_dt = float(self.get_parameter("pick_drop_dt").value)
         self.state_rate = float(self.get_parameter("robot_state_rate_hz").value)
@@ -160,13 +165,6 @@ class WarehouseRobotNode(Node):
     def on_cancel(self, goal_handle) -> CancelResponse:
         return CancelResponse.ACCEPT
 
-    def _compute_move_time(self, src: Tuple[float, float], dst: Tuple[float, float]) -> float:
-        dx = dst[0] - src[0]
-        dy = dst[1] - src[1]
-        dist = math.sqrt(dx * dx + dy * dy)
-        base = (dist / max(self.move_speed, 1e-6)) * self.move_factor
-        rnd = self.rng.uniform(self.move_rand_min, self.move_rand_max)
-        return float(base + rnd)
 
     def _wait_for_service(self, client, name: str, timeout_s: float = 5.0) -> bool:
         t0 = time.time()
@@ -330,9 +328,14 @@ class WarehouseRobotNode(Node):
                 return res
 
             target = parts[1]
-            dst = STATION_COORDS[target]
-            src = self._pose
-            total = self._compute_move_time(src, dst)
+            move_to = f"STATION_{target}"
+            if self.robot_location == "ON_TRANSIT":
+                move_from = "START"
+            else:
+                move_from = self.robot_location
+            key = f"('{move_from}', '{move_to}')"
+            move_to_time = self.move_to_data["paths"][key]["time"]
+            total = move_to_time
 
             self.robot_mode = "BUSY"
             self.robot_location = "ON_TRANSIT"
@@ -351,7 +354,6 @@ class WarehouseRobotNode(Node):
             dt = float(total)
             self._drain_battery(dt)
 
-            self._pose = dst
             self.robot_location = target
             self.robot_mode = "IDLE"
             self.publish_state()

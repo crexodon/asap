@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-import time
 from typing import Dict
 
 import gymnasium as gym
 import numpy as np
 
-from .constants import FLAT_ACTIONS_N, STATIONS
-from .encoding import EncodedState
-from .masking import compute_action_mask, flat_to_type_param, station_param_to_station
-from .ros_interface import WarehouseROSInterface
+from constants import FLAT_ACTIONS_N, STATIONS
+from encoding_train import EncodedState
+from masking_train import compute_action_mask, flat_to_type_param, station_param_to_station
+from training_simulator import Simulator
 
 SUCCESS_BONUS = 1000.0
 FAIL_PENALTY = 600
@@ -19,14 +18,12 @@ WAIT_PENALTY = 0
 
 
 class WarehouseMDPEnv(gym.Env):
-    """Gymnasium env backed for inference with ROS2 environment
+    """
+    Gymnasium env backed for training
     """
 
-    metadata = {"render_modes": []}
-
-    def __init__(self, ros: WarehouseROSInterface):
-        super().__init__()
-        self.ros = ros
+    def __init__(self, model: Simulator):
+        self.model = model
         self.action_space = gym.spaces.Discrete(FLAT_ACTIONS_N)
 
         # Observation space
@@ -45,10 +42,9 @@ class WarehouseMDPEnv(gym.Env):
         )
 
         self._episode_step: int = 0
-
-        self._last_step_time = time.monotonic()
+        self._last_step_time = model.time
         self._last_delta_time = 0.0
-        # Initialize with a zero observation so action_masks() is safe before first reset().
+
         self._last_obs = {
             "battery_status": np.array([0.0], dtype=np.float32),
             "robot_location": np.array([0], dtype=np.int64),
@@ -65,7 +61,7 @@ class WarehouseMDPEnv(gym.Env):
         return compute_action_mask(self._last_obs)
 
     def _get_obs(self, time: float) -> Dict[str, np.ndarray]:
-        st = self.ros.build_encoded_state(time=time)
+        st = self.model.build_encoded_state(time=time)
         if st is None:
             # Fallback empty state
             st = EncodedState(
@@ -80,57 +76,12 @@ class WarehouseMDPEnv(gym.Env):
                 package_availability=np.zeros((20,), dtype=np.int64),
             )
         obs = st.as_dict()
-       
+
         return obs
 
     def reset(self, seed: int | None = None, options: dict | None = None):
-        super().reset(seed=seed)
 
-        # Reset the world
-        do_reset = True
-        if options and isinstance(options, dict):
-            do_reset = bool(options.get("do_reset", True))
-
-        if do_reset:
-
-            ok = self.ros.reset_episode(num_packages=20, timeout_s=5.0)
-            if not ok:
-                raise RuntimeError("Env.reset(): /reset_episode returned False")
-
-        # Wait until the world is ready
-        t0 = time.monotonic()
-        timeout_s = 5.0
-
-        last_err = None
-        while time.monotonic() - t0 < timeout_s:
-            try:
-                # Ensure robot_state is cached
-                if not self.ros.wait_for_robot_state(timeout_s=0.2):
-                    time.sleep(0.02)
-                    continue
-
-                # Ensure get_packages works
-                pkgs_res = self.ros.get_packages(timeout_s=2.0)
-                if pkgs_res is None:
-                    time.sleep(0.02)
-                    continue
-                if not hasattr(pkgs_res, "packages"):
-                    time.sleep(0.02)
-                    continue
-                if len(pkgs_res.packages) != 20:
-                    time.sleep(0.02)
-                    continue
-
-                # Ready
-                break
-
-            except Exception as e:
-                last_err = e
-                time.sleep(0.05)
-                continue
-        else:
-
-            raise RuntimeError(f"Env.reset() timed out waiting for robot_state/packages. last_err={last_err}")
+        self.model.reset()
 
         # Build obs with time = 0.0 at the beginning of episode
         self._episode_step = 0
@@ -151,71 +102,77 @@ class WarehouseMDPEnv(gym.Env):
         reward_wait = 0.0
         penalty_charge = 0.0
 
-
         # Execute action
         if atype == 0:  # WAIT
-            self.ros.send_wait_for_logging()
-            waited = self.ros.wait_for_interrupt_event(timeout_s=1.0)
-            
-            dt = float(waited) if waited is not None else 1.0
-            if dt is None:
-                dt = 1.0
-            reward_wait = WAIT_PENALTY
+            res, dt = self.model.cmd("WAIT", -1)
+            if res:
+                reward_wait = WAIT_PENALTY
+            print("WAIT")
 
         elif atype == 1:  # CHARGE
-            penalty_charge = float(self._last_obs["battery_status"][0]) / 5
-            res = self.ros.send_cmd("CHARGE")
-            dt = res.dt
+            penalty_charge = self.model.robot_battery / 5 # large penalty if charging is performed at high battery status
+            res, dt = self.model.cmd("CHARGE", -1)
+            if not res:
+                penalty_charge = 0.0
+                
+            print("CHARGE")
+
         elif atype == 2:  # MOVE_TO
-            station = station_param_to_station(param)
-            res = self.ros.send_cmd(f"MOVE_TO {station}")
-            dt = res.dt
+            res, dt = self.model.cmd("MOVE_TO", param)
+            print(f"MOVE_TO{param}")
+
         elif atype == 3:  # PICK
-            res = self.ros.send_cmd(f"PICK {param}")
-            dt = res.dt
-            reward_pick = PICK_BONUS
+            res, dt = self.model.cmd("PICK", param)
+            if res:
+                reward_pick = PICK_BONUS
+            print(f"PICK{param}")
+
         elif atype == 4:  # DROP
-            res = self.ros.send_cmd(f"DROP {param}")
-            dt = res.dt
-            reward_drop= DROP_BONUS
+            res, dt = self.model.cmd("DROP", param)
+            if res:
+                reward_drop = DROP_BONUS
+            print(f"DROP{param}")
+
         elif atype == 5:  # PICK_A
-            res = self.ros.send_cmd(f"PICK_A {param}")
-            dt = res.dt
-            reward_pick = PICK_BONUS
+            res, dt = self.model.cmd("PICK_A", param)
+            if res:
+                reward_pick = PICK_BONUS
+            print(f"PICK_A{param}")
+
         else:
             dt = 0.0
 
+        if res == False:
+            print("invalid action!!!!")
+
         # Reward is negative actual elapsed time
-        reward = -2* float(dt) + reward_pick + reward_drop + reward_wait - penalty_charge
+        reward = -2*float(dt) + reward_pick + reward_drop + reward_wait - penalty_charge
         battery_depleted = False
 
         # Episode termination logic
-        terminated = self.ros.is_done()
-
-        # Battery depleted ends the episode as terminal failure
-        if self.ros.wait_for_robot_state(timeout_s=0.1):
-            with self.ros._robot_state_lock:
-                rs = self.ros._robot_state
-            if rs is not None and float(rs.battery) <= 0.0:
-                battery_depleted = True
+        terminated = self.model.is_done()
                 
         # Battery depleted ends the episode as terminal failure
-        if battery_depleted:
+        if self.model.robot_battery <= 0.0:
+            battery_depleted = True
             terminated = True
             truncated = False
             reward -= FAIL_PENALTY
+            print("battery is empty")
 
         # Success bonus 
-        if terminated and (not battery_depleted) and self.ros.is_done():
+        if terminated and (not battery_depleted) and self.model.is_done():
             reward += SUCCESS_BONUS
+            print("SUCCESSFUL")
 
-        if self.ros.episode_elapsed_s() >= self.ros.max_episode_time_s:
+        if self.model.episode_elapsed_s() >= self.model.max_episode_time_s:
             truncated = True
+            print("Time elapsed")
 
         # Update obs
         self._last_delta_time = dt
-        self._last_step_time = time.monotonic()
-        self._last_obs = self._get_obs(time=self._last_step_time)
+        self._last_step_time = self.model.time
+        self._last_obs = self._get_obs(time=self.model.time)
         info = {"dt": float(dt)}
         self._episode_step += 1
         return self._last_obs, reward, terminated, truncated, info

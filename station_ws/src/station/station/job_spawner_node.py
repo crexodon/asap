@@ -58,7 +58,7 @@ class JobSpawner(Node):
         self.get_logger().info("EPISODE_RESET received -> Spawning first package immediately.")
         self.spawn_one()
 
-        # spawn every 20 seconds (restart)
+        # spawn every 20 seconds
         self._spawn_timer = self.create_timer(20.0, self.spawn_one)
         self.get_logger().info("Spawner interval started (next package in 20s)")
     

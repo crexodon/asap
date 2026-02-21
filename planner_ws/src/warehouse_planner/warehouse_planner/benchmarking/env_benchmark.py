@@ -6,10 +6,10 @@ from typing import Dict
 import gymnasium as gym
 import numpy as np
 
-from .constants import FLAT_ACTIONS_N, STATIONS
-from .encoding import EncodedState
-from .masking import compute_action_mask, flat_to_type_param, station_param_to_station
-from .ros_interface import WarehouseROSInterface
+from constants import FLAT_ACTIONS_N, STATIONS
+from encoding_train import EncodedState
+from masking_train import compute_action_mask, flat_to_type_param, station_param_to_station
+from training_simulator import Simulator
 
 SUCCESS_BONUS = 1000.0
 FAIL_PENALTY = 600
@@ -19,13 +19,10 @@ WAIT_PENALTY = 0
 
 
 class WarehouseMDPEnv(gym.Env):
-    """Gymnasium env backed for inference with ROS2 environment
+    """Gymnasium env backed for inference with with headless environment
     """
 
-    metadata = {"render_modes": []}
-
-    def __init__(self, ros: WarehouseROSInterface):
-        super().__init__()
+    def __init__(self, ros: Simulator):
         self.ros = ros
         self.action_space = gym.spaces.Discrete(FLAT_ACTIONS_N)
 
@@ -45,9 +42,9 @@ class WarehouseMDPEnv(gym.Env):
         )
 
         self._episode_step: int = 0
-
-        self._last_step_time = time.monotonic()
+        self._last_step_time = ros.time
         self._last_delta_time = 0.0
+
         # Initialize with a zero observation so action_masks() is safe before first reset().
         self._last_obs = {
             "battery_status": np.array([0.0], dtype=np.float32),
@@ -84,53 +81,8 @@ class WarehouseMDPEnv(gym.Env):
         return obs
 
     def reset(self, seed: int | None = None, options: dict | None = None):
-        super().reset(seed=seed)
 
-        # Reset the world
-        do_reset = True
-        if options and isinstance(options, dict):
-            do_reset = bool(options.get("do_reset", True))
-
-        if do_reset:
-
-            ok = self.ros.reset_episode(num_packages=20, timeout_s=5.0)
-            if not ok:
-                raise RuntimeError("Env.reset(): /reset_episode returned False")
-
-        # Wait until the world is ready
-        t0 = time.monotonic()
-        timeout_s = 5.0
-
-        last_err = None
-        while time.monotonic() - t0 < timeout_s:
-            try:
-                # Ensure robot_state is cached
-                if not self.ros.wait_for_robot_state(timeout_s=0.2):
-                    time.sleep(0.02)
-                    continue
-
-                # Ensure get_packages works
-                pkgs_res = self.ros.get_packages(timeout_s=2.0)
-                if pkgs_res is None:
-                    time.sleep(0.02)
-                    continue
-                if not hasattr(pkgs_res, "packages"):
-                    time.sleep(0.02)
-                    continue
-                if len(pkgs_res.packages) != 20:
-                    time.sleep(0.02)
-                    continue
-
-                # Ready
-                break
-
-            except Exception as e:
-                last_err = e
-                time.sleep(0.05)
-                continue
-        else:
-
-            raise RuntimeError(f"Env.reset() timed out waiting for robot_state/packages. last_err={last_err}")
+        self.ros.reset()
 
         # Build obs with time = 0.0 at the beginning of episode
         self._episode_step = 0
@@ -154,36 +106,46 @@ class WarehouseMDPEnv(gym.Env):
 
         # Execute action
         if atype == 0:  # WAIT
-            self.ros.send_wait_for_logging()
-            waited = self.ros.wait_for_interrupt_event(timeout_s=1.0)
-            
-            dt = float(waited) if waited is not None else 1.0
-            if dt is None:
-                dt = 1.0
-            reward_wait = WAIT_PENALTY
+            res, dt = self.ros.cmd("WAIT", -1)
+            if res:
+                reward_wait = WAIT_PENALTY
+            print("WAIT")
 
         elif atype == 1:  # CHARGE
-            penalty_charge = float(self._last_obs["battery_status"][0]) / 5
-            res = self.ros.send_cmd("CHARGE")
-            dt = res.dt
+            penalty_charge = self.ros.robot_battery / 5 # large penalty if charging is performed at high battery status
+            res, dt = self.ros.cmd("CHARGE", -1)
+            if not res:
+                penalty_charge = 0.0
+                
+            print("CHARGE")
+
         elif atype == 2:  # MOVE_TO
-            station = station_param_to_station(param)
-            res = self.ros.send_cmd(f"MOVE_TO {station}")
-            dt = res.dt
+            res, dt = self.ros.cmd("MOVE_TO", param)
+            print(f"MOVE_TO{param}")
+
         elif atype == 3:  # PICK
-            res = self.ros.send_cmd(f"PICK {param}")
-            dt = res.dt
-            reward_pick = PICK_BONUS
+            res, dt = self.ros.cmd("PICK", param)
+            if res:
+                reward_pick = PICK_BONUS
+            print(f"PICK{param}")
+
         elif atype == 4:  # DROP
-            res = self.ros.send_cmd(f"DROP {param}")
-            dt = res.dt
-            reward_drop= DROP_BONUS
+            res, dt = self.ros.cmd("DROP", param)
+            if res:
+                reward_drop = DROP_BONUS
+            print(f"DROP{param}")
+
         elif atype == 5:  # PICK_A
-            res = self.ros.send_cmd(f"PICK_A {param}")
-            dt = res.dt
-            reward_pick = PICK_BONUS
+            res, dt = self.ros.cmd("PICK_A", param)
+            if res:
+                reward_pick = PICK_BONUS
+            print(f"PICK_A{param}")
+
         else:
             dt = 0.0
+
+        if res == False:
+            print("invalid action!!!!")
 
         # Reward is negative actual elapsed time
         reward = -2* float(dt) + reward_pick + reward_drop + reward_wait - penalty_charge
@@ -193,24 +155,21 @@ class WarehouseMDPEnv(gym.Env):
         terminated = self.ros.is_done()
 
         # Battery depleted ends the episode as terminal failure
-        if self.ros.wait_for_robot_state(timeout_s=0.1):
-            with self.ros._robot_state_lock:
-                rs = self.ros._robot_state
-            if rs is not None and float(rs.battery) <= 0.0:
-                battery_depleted = True
-                
-        # Battery depleted ends the episode as terminal failure
-        if battery_depleted:
+        if self.ros.robot_battery <= 0.0:
+            battery_depleted = True
             terminated = True
             truncated = False
             reward -= FAIL_PENALTY
+            print("battery is empty")
 
         # Success bonus 
         if terminated and (not battery_depleted) and self.ros.is_done():
             reward += SUCCESS_BONUS
+            print("SUCCESSFUL")
 
         if self.ros.episode_elapsed_s() >= self.ros.max_episode_time_s:
             truncated = True
+            print("Time elapsed")
 
         # Update obs
         self._last_delta_time = dt

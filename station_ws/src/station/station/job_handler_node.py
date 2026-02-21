@@ -1,4 +1,3 @@
-import random
 from rclpy.node import Node
 import rclpy
 from interfaces.srv import SetPackageInfo, ResetEpisode, GetPackages
@@ -99,8 +98,6 @@ class JobHandler(Node):
         return res
     
     def on_world_event(self, msg: WorldEvent):
-        # We only care about Station C finishing successfully.
-        # Station C only emits PROCESS_FINISHED when it really finished and put pkg into output.
         if msg.event_type != "PROCESS_FINISHED":
             return
         if msg.station_id != "C":

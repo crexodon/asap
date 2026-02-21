@@ -1,4 +1,7 @@
 build/
 install/
 log/
-/home/norika-schneider/asap/planner_ws/src/warehouse_planner/warehouse_planner/__pycache__
+/home/norika-schneider/asap/planner_ws/src/warehouse_planner/warehouse_planner/__pycache__/
+/home/norika-schneider/asap/planner_ws/src/warehouse_planner/tensor_log/
+/home/norika-schneider/asap/planner_ws/src/warehouse_robot/warehouse_robot/__pycache__/
+/home/norika-schneider/asap/station_ws/src/station/station/__pycache__/

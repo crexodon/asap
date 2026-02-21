@@ -3,7 +3,7 @@
   <name>warehouse_planner</name>
   <version>0.1.0</version>
   <description>Event-driven MDP warehouse planner using SB3 Maskable PPO.</description>
-  <maintainer email="todo@example.com">todo</maintainer>
+  <maintainer email="noschneide@stud.hs-heilbronn.de">todo</maintainer>
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_python</buildtool_depend>
@@ -12,8 +12,6 @@
   <depend>interfaces_planner</depend>
   <depend>std_msgs</depend>
   <exec_depend>ament_index_python</exec_depend>
-
-  <!-- Python deps (installed via pip in most setups) -->
   <exec_depend>python3-numpy</exec_depend>
 
   <test_depend>ament_flake8</test_depend>

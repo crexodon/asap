@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 import numpy as np
 
-from .constants import (
+from constants import (
     LIFECYCLE_STATES,
     PACKAGE_LOCATIONS,
     NEXT_LOCATIONS,

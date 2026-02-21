@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from .constants import ACTION_TYPES, FLAT_ACTIONS_N, STATIONS
-from .encoding import PACKAGE_LOCATION_TO_IDX, ROBOT_LOCATION_TO_IDX
+from constants import ACTION_TYPES, FLAT_ACTIONS_N, STATIONS
+from encoding_train import PACKAGE_LOCATION_TO_IDX, ROBOT_LOCATION_TO_IDX
 
 
 def flat_to_type_param(action: int) -> tuple[int, int]:
@@ -41,7 +41,6 @@ def compute_action_mask(obs: dict) -> np.ndarray:
     station_f_idx = ROBOT_LOCATION_TO_IDX["F"]
     station_e_idx = ROBOT_LOCATION_TO_IDX["E"]
 
-
     # If robot is in transit, only MOVE_A remains available.
     if robot_loc_idx == on_transit_idx:
         mask[type_param_to_flat(2, STATIONS.index("A"))] = True
@@ -60,7 +59,6 @@ def compute_action_mask(obs: dict) -> np.ndarray:
 
     # CHARGE only when at F and battery < 50 (avoid double-charging at full)
     if robot_loc_idx == station_f_idx and battery < 50.0:
-         for p in range(20):
              mask[type_param_to_flat(1, 0)] = True
 
     # MOVE_TO only when not ON_TRANSIT
